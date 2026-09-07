@@ -1,0 +1,38 @@
+// Keep this local fallback aligned with migration 0005_exhaustive_it_skill_catalog.sql.
+const names = [
+  ".NET", "Assembly", "Bash", "C", "C#", "C++", "Clojure", "COBOL", "Dart", "Elixir", "Elm", "Erlang", "F#", "Fortran", "Go", "Groovy", "Haskell", "Java", "JavaScript", "Julia", "Kotlin", "Lua", "MATLAB", "Objective-C", "PHP", "Python", "R", "Ruby", "Rust", "Scala", "TypeScript",
+  "Angular", "Astro", "Bootstrap", "CSS", "D3.js", "Electron", "Ember.js", "Gatsby", "HTML", "HTMX", "jQuery", "Lit", "Material UI", "Next.js", "Nuxt", "Progressive Web Apps", "React", "Redux", "Remix", "Responsive Web Design", "Sass", "SolidJS", "Storybook", "Svelte", "SvelteKit", "Tailwind CSS", "Vite", "Vue.js", "Web Accessibility", "Web Components",
+  "API Design", "ASP.NET Core", "Deno", "Django", "Dropwizard", "Express.js", "FastAPI", "Flask", "GraphQL", "gRPC", "Jakarta EE", "Laravel", "Micronaut", "Microservices", "NestJS", "Node.js", "OpenAPI", "Phoenix", "Quarkus", "RabbitMQ", "REST APIs", "Ruby on Rails", "Server-Sent Events", "SOAP", "Spring Boot", "Symfony", "WebSockets", "Webhooks", "WebRTC", "ZeroMQ",
+  "Android", "Android SDK", "Capacitor", "Expo", "Firebase", "Flutter", "Ionic", "iOS", "Jetpack Compose", "Kotlin Multiplatform", ".NET MAUI", "Mobile Accessibility", "Mobile App Security", "React Native", "Swift", "SwiftUI", "UIKit", "Xamarin",
+  "Amazon Aurora", "Amazon RDS", "Cassandra", "CockroachDB", "Couchbase", "CouchDB", "Database Administration", "Database Design", "DynamoDB", "Elasticsearch", "Firestore", "InfluxDB", "MariaDB", "MongoDB", "MySQL", "Neo4j", "OpenSearch", "Oracle Database", "PostgreSQL", "Redis", "SQL", "SQL Server", "SQLite", "Supabase", "TiDB", "Vector Databases", "Vertica",
+  "Alibaba Cloud", "AWS", "AWS CloudFormation", "AWS Lambda", "Azure", "Azure Functions", "Cloud Architecture", "Cloud Cost Management", "Cloud Migration", "Cloud Security", "Cloudflare", "Cloudflare D1", "Cloudflare Workers", "DigitalOcean", "Edge Computing", "Google Cloud", "Google Cloud Functions", "Heroku", "Hybrid Cloud", "IBM Cloud", "Infrastructure as a Service", "Oracle Cloud", "Platform as a Service", "Serverless", "Software as a Service", "Vercel", "VMware Cloud",
+  "Ansible", "Argo CD", "Azure DevOps", "Buildkite", "CI/CD", "CircleCI", "Configuration Management", "Consul", "Continuous Delivery", "DevOps", "Docker", "Flux CD", "Git", "GitHub Actions", "GitLab CI/CD", "GitOps", "Gradle", "Helm", "Infrastructure as Code", "Jenkins", "Kubernetes", "Maven", "Nomad", "OpenShift", "Packer", "Platform Engineering", "Pulumi", "Release Management", "Site Reliability Engineering", "Sonatype Nexus Repository", "Terraform", "Vault", "VMware vSphere",
+  "Application Security", "Cloud Security Posture Management", "Cryptography", "DAST", "Data Loss Prevention", "DevSecOps", "Digital Forensics", "Endpoint Detection and Response", "Ethical Hacking", "Governance, Risk, and Compliance", "Identity and Access Management", "Incident Response", "ISO 27001", "JWT", "Malware Analysis", "Network Security", "OAuth 2.0", "OpenID Connect", "OWASP", "Penetration Testing", "PKI", "Privacy Engineering", "SAST", "Secure Coding", "Security Architecture", "Security Operations", "SIEM", "Software Composition Analysis", "Threat Intelligence", "Threat Modeling", "Vulnerability Management", "Zero Trust",
+  "Accessibility Testing", "API Testing", "Contract Testing", "Cypress", "End-to-End Testing", "Exploratory Testing", "Integration Testing", "Jest", "JUnit", "k6", "Load Testing", "Mutation Testing", "Performance Testing", "Playwright", "Postman", "Property-Based Testing", "pytest", "Quality Assurance", "React Testing Library", "Selenium", "Test Automation", "Vitest",
+  "Apache Airflow", "Apache Beam", "Apache Flink", "Apache Hadoop", "Apache Kafka", "Apache Spark", "BigQuery", "Business Intelligence", "Data Analytics", "Data Engineering", "Data Governance", "Data Lakes", "Data Modeling", "Data Warehousing", "Databricks", "dbt", "ETL/ELT", "Jupyter", "Looker", "NumPy", "Pandas", "Power BI", "Snowflake", "Tableau", "Talend", "Trino", "Data Visualization", "Stream Processing",
+  "AI Agents", "AI Ethics", "Computer Vision", "Deep Learning", "Feature Engineering", "Generative AI", "Hugging Face", "Keras", "LangChain", "Large Language Models", "Machine Learning", "MLflow", "MLOps", "Model Evaluation", "Model Serving", "Natural Language Processing", "ONNX", "OpenAI API", "Prompt Engineering", "PyTorch", "Recommender Systems", "Reinforcement Learning", "Responsible AI", "Retrieval-Augmented Generation", "scikit-learn", "TensorFlow", "Time Series Forecasting", "Transformers", "Vertex AI", "Vector Embeddings", "XGBoost", "Amazon SageMaker",
+  "Clean Architecture", "Clean Code", "CQRS", "Design Patterns", "Distributed Systems", "Domain-Driven Design", "Enterprise Architecture", "Event-Driven Architecture", "Hexagonal Architecture", "High-Performance Computing", "Message-Driven Architecture", "Object-Oriented Design", "Reactive Architecture", "Refactoring", "Scalability", "Service-Oriented Architecture", "Software Architecture", "Software Design", "SOLID Principles", "Systems Design", "Technical Debt Management", "Event Sourcing",
+  "Application Performance Monitoring", "Datadog", "Distributed Tracing", "Dynatrace", "Elastic Stack", "Error Tracking", "Grafana", "Incident Management", "Jaeger", "Log Management", "New Relic", "OpenTelemetry", "PagerDuty", "Prometheus", "Service Level Objectives", "Splunk", "Synthetic Monitoring", "Uptime Monitoring",
+  "Active Directory", "Cisco IOS", "Computer Networking", "DNS", "Embedded Systems", "FreeBSD", "HTTP", "Internet of Things", "Linux", "Load Balancing", "macOS Administration", "Nginx", "Network Architecture", "Network Automation", "OpenWrt", "Real-Time Systems", "TCP/IP", "Unix", "Virtualization", "VPN", "Windows Server", "Wireless Networking",
+  "Bitcoin", "Blockchain", "Consensus Algorithms", "Cosmos SDK", "Cryptocurrency", "Decentralized Applications", "Ethereum", "Hyperledger Fabric", "IPFS", "Rust Smart Contracts", "Smart Contracts", "Solana", "Solidity", "Web3",
+  "3D Modeling", "ARCore", "ARKit", "Augmented Reality", "Blender", "CryEngine", "Game Design", "Game Development", "Godot", "Graphics Programming", "OpenGL", "Unity", "Unreal Engine", "Virtual Reality",
+  "Accessibility and Inclusion", "Adobe Creative Cloud", "Content Design", "Customer Experience", "Design Systems", "Figma", "Graphic Design", "Human-Computer Interaction", "Information Architecture", "Interaction Design", "Product Analytics", "Product Discovery", "Product Management", "Prototyping", "Service Design", "UI Design", "Usability Testing", "User Experience Design", "User Research", "Wireframing",
+  "Agile Coaching", "Agile Delivery", "Business Analysis", "Change Management", "Design Thinking", "Developer Experience", "Extreme Programming", "IT Service Management", "ITIL", "Kanban", "Lean Software Development", "OKRs", "Portfolio Management", "PRINCE2", "Product Roadmapping", "Project Management", "Requirements Engineering", "Risk Management", "Scrum", "Stakeholder Management",
+];
+
+const slugOverrides = {
+  ".NET": "dotnet",
+  "C#": "c-sharp",
+  "C++": "cpp",
+  "D3.js": "d3-js",
+  "F#": "f-sharp",
+  "Governance, Risk, and Compliance": "governance-risk-compliance",
+  "Identity and Access Management": "identity-access-management",
+  "OAuth 2.0": "oauth-2",
+  "Accessibility and Inclusion": "accessibility-inclusion",
+};
+
+export const fallbackSkills = names.map((name) => ({
+  name,
+  slug: slugOverrides[name] || name.toLowerCase().replaceAll(/[^a-z0-9]+/g, "-").replaceAll(/^-|-$/g, ""),
+}));

@@ -1,0 +1,28 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "yodev-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-28",
+  "workers_dev": true,
+  "assets": {
+    "directory": "../frontend/dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application"
+  },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  "vars": {
+    "CORS_ORIGIN": "http://localhost:5173,https://yodev-api.primera-fila-s.workers.dev",
+    "RATE_AUTH_MAX": "10"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "yodev",
+      "database_id": "e9c14e1d-a125-4ed4-b33c-8d6d7862e795",
+      "migrations_dir": "migrations"
+    }
+  ]
+}

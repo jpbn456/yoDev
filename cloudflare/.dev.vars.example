@@ -1,0 +1,2 @@
+# Optional: permit a deployed frontend origin when API and frontend differ.
+CORS_ORIGIN=http://localhost:5173
