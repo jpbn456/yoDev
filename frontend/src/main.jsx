@@ -2,7 +2,7 @@ import { useEffect, useId, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { QRCodeSVG } from "qrcode.react";
 import { fallbackSkills } from "./fallbackSkills.js";
-import { calculateYears, workModeLabel, toggleValue, filterProfiles } from "./lib/profileUtils.js";
+import { calculateYears, workModeLabel, toggleValue, filterProfiles, proficiencyOptions, optionsWithLegacy, normalizeLanguages, formatEducationPeriod } from "./lib/profileUtils.js";
 import "./styles.css";
 
 const workModes = [
@@ -32,6 +32,9 @@ const appearanceOptions = {
     { value: "orchid", label: "Orquídea" },
     { value: "moss", label: "Musgo" },
     { value: "sunset", label: "Atardecer" },
+    { value: "terracotta", label: "Terracota" },
+    { value: "lagoon", label: "Laguna" },
+    { value: "slate", label: "Pizarra" },
   ],
   font: [
     { value: "sans", label: "Sans editorial" },
@@ -208,9 +211,12 @@ function normalizeProfile(profile) {
     style: { ...defaultStyle, ...profile.style },
     skills: (profile.skills || []).map((skill) => (typeof skill === "string" ? skill : skill.name)),
     workModes: (profile.workModes || []).map(modeLabel),
-    contacts: profile.contacts || {},
+    contacts: profile.editable ? {
+      email: profile.editable.visibleContacts?.includes("email") ? profile.contacts?.email : null,
+      linkedin: profile.editable.visibleContacts?.includes("linkedin") ? profile.contacts?.linkedin : null,
+    } : profile.contacts || {},
     experiences: profile.experiences || [],
-    languages: profile.languages || [],
+    languages: normalizeLanguages(profile.languages || []),
     education: profile.education || [],
   };
 }
@@ -268,10 +274,11 @@ function Field({ label, value, setValue, textarea = false, type = "text", requir
 }
 
 function SelectField({ label, value, setValue, options }) {
+  const id = useId();
   return (
-    <label className="field">
+    <label className="field" htmlFor={id}>
       <span>{label}</span>
-      <select value={value} onChange={(event) => setValue(event.target.value)}>
+      <select id={id} aria-label={label} value={value} onChange={(event) => setValue(event.target.value)}>
         {options.map((option) => (
           <option key={option.value} value={option.value}>
             {option.label}
@@ -617,7 +624,7 @@ function LanguagePicker({ label, options, selected, onChange }) {
 }
 
 function ProfileEditor({ profile, skillOptions, close, saved }) {
-  const [draft, setDraft] = useState(profile);
+  const [draft, setDraft] = useState(() => ({ ...profile, languages: normalizeLanguages(profile.languages || []) }));
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const update = (key, value) => setDraft((current) => ({ ...current, [key]: value }));
@@ -645,7 +652,6 @@ function ProfileEditor({ profile, skillOptions, close, saved }) {
         body: JSON.stringify(draft),
       });
       saved(result);
-      close();
     } catch (failure) {
       setError(failure.message);
     } finally {
@@ -654,7 +660,22 @@ function ProfileEditor({ profile, skillOptions, close, saved }) {
   }
 
   return (
-    <Dialog onClose={close} className="editor-dialog">
+    <div className="profile-editor">
+      <aside className="editor-preview-panel" id="card-preview">
+        <div className="live-preview">
+          <strong>Vista previa</strong>
+          <ProfileCard profile={preview} preview />
+          <section className="form-section appearance-section">
+            <h3>Personalización de Tarjeta</h3>
+            <div className="appearance-fields">
+              <SelectField label="Paleta" value={draft.style.palette} setValue={(value) => updateStyle("palette", value)} options={appearanceOptions.palette} />
+              <SelectField label="Tipografía" value={draft.style.font} setValue={(value) => updateStyle("font", value)} options={appearanceOptions.font} />
+              <SelectField label="Distribución" value={draft.style.layout} setValue={(value) => updateStyle("layout", value)} options={appearanceOptions.layout} />
+              <SelectField label="Alineación" value={draft.style.alignment} setValue={(value) => updateStyle("alignment", value)} options={appearanceOptions.alignment} />
+            </div>
+          </section>
+        </div>
+      </aside>
       <div className="editor-copy">
         <h2>Tu tarjeta, con tus reglas.</h2>
         <p>Completá tu perfil y elegí cuánto querés mostrar. Los cambios visuales aparecen en la vista previa.</p>
@@ -700,7 +721,7 @@ function ProfileEditor({ profile, skillOptions, close, saved }) {
 
           <RepeatableSection
             title="Idiomas"
-            hint="Indicá el idioma y cómo describís tu dominio."
+            hint="Selecciona cada idioma y su nivel según el MCER (A1–C2) o nativo. Los valores anteriores se conservan."
             items={draft.languages}
             addLabel="Agregar idioma"
             createItem={() => ({ language: "", proficiency: "" })}
@@ -708,8 +729,8 @@ function ProfileEditor({ profile, skillOptions, close, saved }) {
             remove={(index) => update("languages", draft.languages.filter((_, itemIndex) => itemIndex !== index))}
           >
             {(item, _index, change) => <div className="split-fields">
-              <Field label="Idioma" value={item.language} setValue={(value) => change("language", value)} />
-              <Field label="Nivel" value={item.proficiency} setValue={(value) => change("proficiency", value)} />
+              <SelectField label="Idioma" value={item.language} setValue={(value) => change("language", value)} options={optionsWithLegacy(commonLanguages.map((language) => ({ value: language, label: language })), item.language, "Selecciona un idioma")} />
+              <SelectField label="Nivel" value={item.proficiency} setValue={(value) => change("proficiency", value)} options={optionsWithLegacy(proficiencyOptions, item.proficiency, "Selecciona un nivel")} />
             </div>}
           </RepeatableSection>
 
@@ -718,7 +739,7 @@ function ProfileEditor({ profile, skillOptions, close, saved }) {
             hint="Agregá formación formal, cursos extensos o certificaciones relevantes."
             items={draft.education}
             addLabel="Agregar educación"
-            createItem={() => ({ institution: "", degree: "", field: "", start: "", end: "" })}
+            createItem={() => ({ institution: "", degree: "", field: "", start: "", end: "", current: false })}
             update={(education) => update("education", education)}
             remove={(index) => update("education", draft.education.filter((_, itemIndex) => itemIndex !== index))}
           >
@@ -730,8 +751,9 @@ function ProfileEditor({ profile, skillOptions, close, saved }) {
               </div>
               <div className="split-fields">
                 <Field label="Desde" type="month" value={item.start} setValue={(value) => change("start", value)} />
-                <Field label="Hasta" type="month" value={item.end} setValue={(value) => change("end", value)} />
+                <Field label="Hasta" type="month" disabled={item.current === true} value={item.current === true ? "" : item.end} setValue={(value) => change("end", value)} />
               </div>
+              <label className="inline-check"><input type="checkbox" checked={item.current === true} onChange={(event) => change("current", event.target.checked)} /> En curso</label>
             </>}
           </RepeatableSection>
 
@@ -778,16 +800,6 @@ function ProfileEditor({ profile, skillOptions, close, saved }) {
             />
           </section>
 
-          <section className="form-section appearance-section">
-            <h3>Apariencia controlada</h3>
-            <div className="appearance-fields">
-              <SelectField label="Paleta" value={draft.style.palette} setValue={(value) => updateStyle("palette", value)} options={appearanceOptions.palette} />
-              <SelectField label="Tipografía" value={draft.style.font} setValue={(value) => updateStyle("font", value)} options={appearanceOptions.font} />
-              <SelectField label="Layout" value={draft.style.layout} setValue={(value) => updateStyle("layout", value)} options={appearanceOptions.layout} />
-              <SelectField label="Alineación" value={draft.style.alignment} setValue={(value) => updateStyle("alignment", value)} options={appearanceOptions.alignment} />
-            </div>
-          </section>
-
           <label className="publication-row">
             <input
               type="checkbox"
@@ -808,14 +820,11 @@ function ProfileEditor({ profile, skillOptions, close, saved }) {
             <button type="button" className="secondary-action" onClick={close}>
               Cancelar
             </button>
+            <a className="preview-link" href="#card-preview">Ver tarjeta</a>
           </div>
         </form>
       </div>
-      <aside className="live-preview">
-        <strong>Vista previa</strong>
-        <ProfileCard profile={preview} preview />
-      </aside>
-    </Dialog>
+    </div>
   );
 }
 
@@ -867,7 +876,7 @@ function ProfileDetail({ profile, owner = false, onEdit }) {
         <p className="share-status" role="status" aria-live="polite">{shareStatus}</p>
       </div>
 
-      <article className={`resume-profile palette-${style.palette} font-${style.font} align-${style.alignment}`}>
+      <article className={`resume-profile palette-${style.palette} font-${style.font} layout-${style.layout} align-${style.alignment}`}>
         <header className="resume-hero">
           <div className="virtual-card-heading">
             <span>{profile.title || "Developer"}</span>
@@ -900,7 +909,7 @@ function ProfileDetail({ profile, owner = false, onEdit }) {
               <h2>Educación</h2>
               <div className="timeline-list">
                 {profile.education.map((item, index) => <article key={`${item.institution}-${item.degree}-${index}`}>
-                  <div className="timeline-heading"><div><h3>{item.degree || item.field || "Formación"}</h3><p>{[item.institution, item.degree && item.field].filter(Boolean).join(" · ")}</p></div><time>{formatPeriod(item.start, item.end)}</time></div>
+                  <div className="timeline-heading"><div><h3>{item.degree || item.field || "Formación"}</h3><p>{[item.institution, item.degree && item.field].filter(Boolean).join(" · ")}</p></div><time>{formatEducationPeriod(item)}</time></div>
                 </article>)}
                 {!profile.education.length && <p className="resume-empty">Sin educación cargada.</p>}
               </div>
@@ -966,7 +975,7 @@ function ProfileDetail({ profile, owner = false, onEdit }) {
 
       <section className="print-sheet" aria-hidden="true">
         {Array.from({ length: 10 }, (_, index) => (
-          <article key={index} className={`print-card-copy palette-${style.palette} font-${style.font} align-${style.alignment}`}>
+          <article key={index} className={`print-card-copy palette-${style.palette} font-${style.font} layout-${style.layout} align-${style.alignment}`}>
             <div>
               <span className="print-copy-role">{profile.title || "Developer"}</span>
               <h2>{profile.firstName} <em>{profile.lastName}</em></h2>
@@ -1263,7 +1272,7 @@ function App() {
   const [routeSlug, setRouteSlug] = useState(() => window.location.pathname.match(/^\/developers\/([^/]+)\/?$/)?.[1] || null);
   const [notice, setNotice] = useState("");
   const [authOpen, setAuthOpen] = useState(false);
-  const [editorOpen, setEditorOpen] = useState(false);
+  const [editorOpen, setEditorOpen] = useState(() => window.location.pathname === "/me/profile/edit");
   const [adminOpen, setAdminOpen] = useState(false);
   const [filtersCollapsed, setFiltersCollapsed] = useState(false);
 
@@ -1284,7 +1293,7 @@ function App() {
     try {
       const profile = await api("/api/me/profile/");
       setAccount(profile);
-      if (openEditor) setEditorOpen(true);
+      if (openEditor) startEditing();
       return profile;
     } catch {
       setAccount(null);
@@ -1318,6 +1327,7 @@ function App() {
     loadDetail(routeSlug);
 
     const handleHistory = () => {
+      setEditorOpen(window.location.pathname === "/me/profile/edit");
       const slug = window.location.pathname.match(/^\/developers\/([^/]+)\/?$/)?.[1];
       setRouteSlug(slug || null);
       loadDetail(slug);
@@ -1357,13 +1367,18 @@ function App() {
   }, [filters, page]);
 
   function openProfile(slug) {
+    setEditorOpen(false);
     window.history.pushState({}, "", `/developers/${slug}`);
     setRouteSlug(slug);
-    setDetail(null);
-    loadDetail(slug);
+    if (account?.slug === slug) setDetail(normalizeProfile(account));
+    else {
+      setDetail(null);
+      loadDetail(slug);
+    }
   }
 
   function closeProfile() {
+    setEditorOpen(false);
     window.history.pushState({}, "", "/");
     setRouteSlug(null);
     setDetail(null);
@@ -1383,11 +1398,34 @@ function App() {
   }
 
   function profileSaved(profile) {
+    setEditorOpen(false);
     setAccount(profile);
     setNotice(profile.editable?.isPublished ? "Tu perfil quedó publicado." : "Guardamos tu perfil como borrador.");
     setFilters((current) => ({ ...current }));
-    if (routeSlug && routeSlug === account.slug) loadDetail(routeSlug);
+    window.history.replaceState({}, "", `/developers/${profile.slug}`);
+    setRouteSlug(profile.slug);
+    setDetail(normalizeProfile(profile));
   }
+
+  function startEditing() {
+    window.history.pushState({}, "", "/me/profile/edit");
+    setEditorOpen(true);
+    window.scrollTo(0, 0);
+  }
+
+  if (editorOpen) return (
+    <main className="profile-page editor-page">
+      <header className="masthead profile-masthead">
+        <a className="wordmark" href="/" onClick={(event) => { event.preventDefault(); closeProfile(); }}>yo<strong>Dev</strong></a>
+        <h1>Mi perfil</h1>
+        <button className="back-link" onClick={closeProfile}>Volver al directorio</button>
+      </header>
+      {account ? <ProfileEditor profile={editorProfile} skillOptions={skillOptions} close={() => openProfile(account.slug)} saved={profileSaved} /> : (
+        <div className="profile-loading"><p>Inicia sesión para editar tu perfil.</p><button onClick={() => setAuthOpen(true)}>Iniciar sesión</button></div>
+      )}
+      {authOpen && <AccountDialog close={() => setAuthOpen(false)} authenticated={() => refreshAccount()} />}
+    </main>
+  );
 
   if (routeSlug) return (
     <main className="profile-page">
@@ -1395,15 +1433,7 @@ function App() {
         <a className="wordmark" href="/">yo<strong>Dev</strong></a>
         <a className="back-link" href="/" onClick={(event) => { event.preventDefault(); closeProfile(); }}>Volver al directorio</a>
       </header>
-      {detail ? <ProfileDetail profile={detail} owner={account?.slug === detail.slug} onEdit={() => setEditorOpen(true)} /> : <div className="profile-loading">{notice || "Cargando perfil…"}</div>}
-      {editorOpen && account && (
-        <ProfileEditor
-          profile={editorProfile}
-          skillOptions={skillOptions}
-          close={() => setEditorOpen(false)}
-          saved={profileSaved}
-        />
-      )}
+      {detail ? <ProfileDetail profile={detail} owner={account?.slug === detail.slug} onEdit={startEditing} /> : <div className="profile-loading">{notice || "Cargando perfil…"}</div>}
     </main>
   );
 
@@ -1461,7 +1491,7 @@ function App() {
       <section className="join-section">
         <p>Tu experiencia también cuenta</p>
         <h2>Convertí lo que sabés hacer en una tarjeta que se recuerde.</h2>
-        <button onClick={() => account ? setEditorOpen(true) : setAuthOpen(true)}>
+        <button onClick={() => account ? startEditing() : setAuthOpen(true)}>
           {account ? "Editar mi perfil" : "Crear mi tarjeta"}
         </button>
       </section>
@@ -1470,14 +1500,6 @@ function App() {
         <AccountDialog
           close={() => setAuthOpen(false)}
           authenticated={(registered) => refreshAccount(registered)}
-        />
-      )}
-      {editorOpen && account && (
-        <ProfileEditor
-          profile={editorProfile}
-          skillOptions={skillOptions}
-          close={() => setEditorOpen(false)}
-          saved={profileSaved}
         />
       )}
       {adminOpen && <AdminPanel close={() => setAdminOpen(false)} />}

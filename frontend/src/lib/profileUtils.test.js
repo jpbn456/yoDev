@@ -4,7 +4,41 @@ import {
   workModeLabel,
   toggleValue,
   filterProfiles,
+  proficiencyOptions,
+  optionsWithLegacy,
+  normalizeLanguages,
+  formatEducationPeriod,
 } from "./profileUtils.js";
+
+describe("education periods", () => {
+  it("labels only explicitly current education as ongoing", () => {
+    expect(formatEducationPeriod({ start: "2024-03", end: "2025-12", current: true })).toBe("2024-03 — En curso");
+    expect(formatEducationPeriod({ current: true })).toBe("En curso");
+    expect(formatEducationPeriod({ start: "2020-03", end: "2023-12" })).toBe("2020-03 — 2023-12");
+    expect(formatEducationPeriod({ start: "2020-03", end: "" })).toBe("2020-03");
+    expect(formatEducationPeriod({ start: "2020-03", current: false })).toBe("2020-03");
+    expect(formatEducationPeriod({})).toBe("");
+  });
+});
+
+describe("language editor compatibility", () => {
+  it("offers CEFR A1–C2 and native without guessing legacy equivalences", () => {
+    expect(proficiencyOptions.map(({ value }) => value)).toEqual(["A1", "A2", "B1", "B2", "C1", "C2", "Nativo"]);
+    const options = optionsWithLegacy(proficiencyOptions, "Conversacional", "Select level");
+    expect(options.at(-1)).toEqual({ value: "Conversacional", label: "Conversacional (guardado)" });
+    expect(optionsWithLegacy(proficiencyOptions, "B2", "Select level").filter(({ value }) => value === "B2")).toHaveLength(1);
+  });
+
+  it("preserves string languages and exact legacy proficiency without mutating saved data", () => {
+    const original = ["Inglés", { language: "Guaraní", proficiency: "Competencia profesional" }];
+    expect(normalizeLanguages(original)).toEqual([
+      { language: "Inglés", proficiency: "" },
+      { language: "Guaraní", proficiency: "Competencia profesional" },
+    ]);
+    expect(original[0]).toBe("Inglés");
+    expect(normalizeLanguages()).toEqual([]);
+  });
+});
 
 const workModes = [
   { value: "remote", label: "Remoto" },

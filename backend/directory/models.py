@@ -35,6 +35,9 @@ class Profile(models.Model):
         ORCHID = "orchid", "Orquídea"
         MOSS = "moss", "Musgo"
         SUNSET = "sunset", "Atardecer"
+        TERRACOTTA = "terracotta", "Terracota"
+        LAGOON = "lagoon", "Laguna"
+        SLATE = "slate", "Pizarra"
 
     class Font(models.TextChoices):
         SANS = "sans", "Sans editorial"

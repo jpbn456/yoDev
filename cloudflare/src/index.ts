@@ -10,10 +10,10 @@ type ProfileRow = UserRow & {
 };
 type ExperienceRow = { company: string; role: string; start_date: string; end_date: string; is_current: number; description: string; technologies: string };
 type LanguageRow = { language: string; proficiency: string };
-type EducationRow = { institution: string; degree: string; field: string; start_date: string; end_date: string };
+type EducationRow = { institution: string; degree: string; field: string; start_date: string; end_date: string; is_current: number };
 type Experience = { company: string; role: string; start: string; end: string; current: boolean; description: string; technologies: string[] };
 type Language = { language: string; proficiency: string };
-type Education = { institution: string; degree: string; field: string; start: string; end: string };
+type Education = { institution: string; degree: string; field: string; start: string; end: string; current: boolean };
 
 const json = (data: unknown, status = 200, headers?: HeadersInit) => Response.json(data, { status, headers });
 const error = (detail: string, status = 400) => json({ detail }, status);
@@ -169,12 +169,12 @@ async function resumeFor(profileId: number, env: Env): Promise<{ experiences: Ex
   const [experienceRows, languageRows, educationRows] = await Promise.all([
     env.DB.prepare("SELECT company, role, start_date, end_date, is_current, description, technologies FROM profile_experiences WHERE profile_id = ? ORDER BY sort_order, id").bind(profileId).all<ExperienceRow>(),
     env.DB.prepare("SELECT language, proficiency FROM profile_languages WHERE profile_id = ? ORDER BY sort_order, id").bind(profileId).all<LanguageRow>(),
-    env.DB.prepare("SELECT institution, degree, field, start_date, end_date FROM profile_education WHERE profile_id = ? ORDER BY sort_order, id").bind(profileId).all<EducationRow>(),
+    env.DB.prepare("SELECT institution, degree, field, start_date, end_date, is_current FROM profile_education WHERE profile_id = ? ORDER BY sort_order, id").bind(profileId).all<EducationRow>(),
   ]);
   return {
     experiences: experienceRows.results.map((item) => ({ company: item.company, role: item.role, start: item.start_date, end: item.end_date, current: Boolean(item.is_current), description: item.description, technologies: parseList(item.technologies) })),
     languages: languageRows.results,
-    education: educationRows.results.map((item) => ({ institution: item.institution, degree: item.degree, field: item.field, start: item.start_date, end: item.end_date })),
+    education: educationRows.results.map((item) => ({ institution: item.institution, degree: item.degree, field: item.field, start: item.start_date, end: item.end_date, current: Boolean(item.is_current) })),
   };
 }
 
@@ -305,8 +305,9 @@ function resumeData(data: JsonRecord): { experiences?: Experience[]; languages?:
       } else {
         const institution = cleanString(item, "institution", 200); const degree = cleanString(item, "degree", 160); const field = cleanString(item, "field", 160);
         const start = cleanDate(item, "start"); const end = cleanDate(item, "end");
-        if ([institution, degree, field, start, end].includes(null)) return { detail: "Revisá los campos de educación y usá fechas AAAA-MM." };
-        values.push({ institution, degree, field, start, end });
+        if ([institution, degree, field, start, end].includes(null) || (item.current !== undefined && typeof item.current !== "boolean")) return { detail: "Revisa los campos de educación y usa fechas AAAA-MM y un valor booleano para En curso." };
+        const current = item.current === true;
+        values.push({ institution, degree, field, start, end: current ? "" : end, current });
       }
     }
     if (key === "experiences") result.experiences = values as Experience[];
@@ -395,7 +396,7 @@ async function handle(request: Request, env: Env): Promise<Response> {
     const statements: D1PreparedStatement[] = [
       env.DB.prepare("UPDATE users SET first_name = ?, last_name = ? WHERE id = ?").bind(firstName, lastName, user.id),
       env.DB.prepare("UPDATE profiles SET professional_title = ?, introduction = ?, email = ?, linkedin_url = ?, portfolio_url = ?, country = ?, region = ?, city = ?, visible_contacts = ?, work_modes = ?, palette = ?, font = ?, layout = ?, alignment = ?, is_published = ?, updated_at = ? WHERE id = ?")
-        .bind(title, introduction, email, stringValue(data, "linkedin", profile.linkedin_url), stringValue(data, "portfolio", profile.portfolio_url), stringValue(data, "country", profile.country), stringValue(data, "region", profile.region), stringValue(data, "city", profile.city), JSON.stringify(permitted(data, "visibleContacts", ["email", "linkedin"], parseList(profile.visible_contacts))), JSON.stringify(permitted(data, "workModes", ["remote", "hybrid", "onsite"], parseList(profile.work_modes))), styleValue("palette", ["ink", "ocean", "orchid", "moss", "sunset"], profile.palette), styleValue("font", ["sans", "serif", "geometric"], profile.font), styleValue("layout", ["classic", "centered", "compact"], profile.layout), styleValue("alignment", ["left", "center"], profile.alignment), Number(published), timestamp, profile.profile_id),
+        .bind(title, introduction, email, stringValue(data, "linkedin", profile.linkedin_url), stringValue(data, "portfolio", profile.portfolio_url), stringValue(data, "country", profile.country), stringValue(data, "region", profile.region), stringValue(data, "city", profile.city), JSON.stringify(permitted(data, "visibleContacts", ["email", "linkedin"], parseList(profile.visible_contacts))), JSON.stringify(permitted(data, "workModes", ["remote", "hybrid", "onsite"], parseList(profile.work_modes))), styleValue("palette", ["ink", "ocean", "orchid", "moss", "sunset", "terracotta", "lagoon", "slate"], profile.palette), styleValue("font", ["sans", "serif", "geometric"], profile.font), styleValue("layout", ["classic", "centered", "compact"], profile.layout), styleValue("alignment", ["left", "center"], profile.alignment), Number(published), timestamp, profile.profile_id),
     ];
     if (Array.isArray(data.skills)) {
       const slugs = data.skills.filter((value): value is string => typeof value === "string");
@@ -412,7 +413,7 @@ async function handle(request: Request, env: Env): Promise<Response> {
     }
     if (resume.education) {
       statements.push(env.DB.prepare("DELETE FROM profile_education WHERE profile_id = ?").bind(profile.profile_id));
-      resume.education.forEach((item, order) => statements.push(env.DB.prepare("INSERT INTO profile_education (profile_id, sort_order, institution, degree, field, start_date, end_date) VALUES (?, ?, ?, ?, ?, ?, ?)").bind(profile.profile_id, order, item.institution, item.degree, item.field, item.start, item.end)));
+      resume.education.forEach((item, order) => statements.push(env.DB.prepare("INSERT INTO profile_education (profile_id, sort_order, institution, degree, field, start_date, end_date, is_current) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").bind(profile.profile_id, order, item.institution, item.degree, item.field, item.start, item.end, Number(item.current))));
     }
     await env.DB.batch(statements);
     const updated = await profileForUser(user.id, env); return json(await serialize(updated!, env, true, true));

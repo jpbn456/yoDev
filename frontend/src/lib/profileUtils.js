@@ -1,6 +1,37 @@
 // Pure business logic for yoDev profile utilities.
 // Kept framework-agnostic so it can be unit-tested without React/DOM.
 
+export const proficiencyOptions = [
+  { value: "A1", label: "A1 · Principiante" },
+  { value: "A2", label: "A2 · Básico" },
+  { value: "B1", label: "B1 · Intermedio" },
+  { value: "B2", label: "B2 · Intermedio alto" },
+  { value: "C1", label: "C1 · Avanzado" },
+  { value: "C2", label: "C2 · Dominio pleno" },
+  { value: "Nativo", label: "Nativo" },
+];
+
+// Keep legacy text selectable without guessing its CEFR equivalence.
+export function optionsWithLegacy(options, value, placeholder) {
+  return [
+    { value: "", label: placeholder },
+    ...options,
+    ...(value && !options.some((option) => option.value === value)
+      ? [{ value, label: `${value} (guardado)` }]
+      : []),
+  ];
+}
+
+export function normalizeLanguages(languages = []) {
+  return languages.map((item) => typeof item === "string"
+    ? { language: item, proficiency: "" }
+    : { ...item, language: item.language || "", proficiency: item.proficiency || "" });
+}
+
+export function formatEducationPeriod({ start, end, current }) {
+  return [start, current === true ? "En curso" : end].filter(Boolean).join(" — ");
+}
+
 /**
  * Calculate total years of professional experience from a list of
  * experience entries. Each entry has optional { start, end, current }.
