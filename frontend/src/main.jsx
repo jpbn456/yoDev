@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { QRCodeSVG } from "qrcode.react";
 import { fallbackSkills } from "./fallbackSkills.js";
-import { calculateYears, workModeLabel, toggleValue, filterProfiles, proficiencyOptions, optionsWithLegacy, normalizeLanguages, formatEducationPeriod, parseTags } from "./lib/profileUtils.js";
+import { calculateYears, workModeLabel, toggleValue, proficiencyOptions, optionsWithLegacy, normalizeLanguages, formatEducationPeriod, parseTags } from "./lib/profileUtils.js";
 import "./styles.css";
 
 const workModes = [
@@ -80,131 +80,6 @@ const blankProfile = {
   style: defaultStyle,
 };
 
-const demoProfiles = [
-  {
-    id: "demo",
-    slug: "demo",
-    firstName: "yo",
-    lastName: "Dev",
-    title: "Backend Developer",
-    introduction: "Perfil de demostración. Activá la API para publicar perfiles reales.",
-    location: "Argentina",
-    country: "Argentina",
-    region: "Buenos Aires",
-    city: "CABA",
-    skills: ["Python", "Django", "PostgreSQL", "Docker"],
-    workModes: ["Remoto"],
-    contacts: { email: "hola@yodev.dev" },
-    portfolio: "",
-    experiences: [
-      { company: "Feature Labs", role: "Backend Developer", start: "2021-03", current: true, description: "APIs REST y microservicios en Python.", technologies: ["Python", "Django", "PostgreSQL"] },
-      { company: "Nubem", role: "Junior Developer", start: "2019-01", end: "2021-02", description: "Mantenimiento de backends Django.", technologies: ["Python", "Django"] },
-    ],
-    languages: [{ language: "Español", proficiency: "Nativo" }, { language: "Inglés", proficiency: "Avanzado" }],
-    education: [{ institution: "UTN", degree: "Ingeniería en Sistemas", field: "Informática", start: "2014", end: "2020" }],
-    style: defaultStyle,
-    isFeatured: false,
-  },
-  {
-    id: "demo-frontend",
-    slug: "demo-frontend",
-    firstName: "Valentina",
-    lastName: "Ríos",
-    title: "Frontend Engineer",
-    introduction: "Diseño interfaces accesibles y de alto rendimiento con React y TypeScript.",
-    location: "Uruguay",
-    country: "Uruguay",
-    region: "Montevideo",
-    city: "Montevideo",
-    skills: ["React", "TypeScript", "Next.js", "Tailwind CSS", "HTML"],
-    workModes: ["Remoto", "Híbrido"],
-    contacts: { linkedin: "https://linkedin.com/in/valentinaros" },
-    portfolio: "https://valentina.dev",
-    experiences: [
-      { company: "Studio Norte", role: "Frontend Engineer", start: "2020-08", current: true, description: "Plataformas de e-commerce headless con Next.js.", technologies: ["React", "Next.js", "TypeScript"] },
-      { company: "Agencia Loop", role: "UI Developer", start: "2018-03", end: "2020-07", description: "Landing pages y design systems.", technologies: ["React", "Tailwind CSS"] },
-    ],
-    languages: [{ language: "Español", proficiency: "Nativo" }, { language: "Portugués", proficiency: "Intermedio" }],
-    education: [{ institution: "ORT", degree: "Licenciatura en Diseño", field: "Diseño Digital", start: "2013", end: "2018" }],
-    style: { ...defaultStyle, palette: "orchid" },
-    isFeatured: false,
-  },
-  {
-    id: "demo-mobile",
-    slug: "demo-mobile",
-    firstName: "Martín",
-    lastName: "Sosa",
-    title: "Mobile Developer",
-    introduction: "Aplicaciones nativas en Swift y Kotlin que se sienten rápidas y confiables.",
-    location: "Argentina",
-    country: "Argentina",
-    region: "Córdoba",
-    city: "Córdoba",
-    skills: ["Swift", "Kotlin", "React Native", "Firebase"],
-    workModes: ["Híbrido", "In-site"],
-    contacts: { email: "msosa@mail.com", linkedin: "https://linkedin.com/in/martinsosa" },
-    portfolio: "",
-    experiences: [
-      { company: "AppWorks", role: "Mobile Developer", start: "2019-06", current: true, description: "Apps iOS y Android para fintech.", technologies: ["Swift", "Kotlin"] },
-    ],
-    languages: [{ language: "Español", proficiency: "Nativo" }],
-    education: [{ institution: "UNC", degree: "Ingeniería en Computación", field: "Informática", start: "2012", end: "2018" }],
-    style: { ...defaultStyle, palette: "moss" },
-    isFeatured: false,
-  },
-  {
-    id: "demo-data",
-    slug: "demo-data",
-    firstName: "Camila",
-    lastName: "Ferreyra",
-    title: "Data Engineer",
-    introduction: "Construyo pipelines de datos escalables en la nube con Python y Spark.",
-    location: "Argentina",
-    country: "Argentina",
-    region: "Buenos Aires",
-    city: "La Plata",
-    skills: ["Python", "Apache Spark", "BigQuery", "Airflow", "SQL", "AWS"],
-    workModes: ["Remoto"],
-    contacts: { email: "cferreyra@data.io" },
-    portfolio: "",
-    experiences: [
-      { company: "Datacorp", role: "Data Engineer", start: "2021-01", current: true, description: "ETL en la nube con Spark y Airflow.", technologies: ["Spark", "Airflow", "BigQuery"] },
-      { company: "Telecom SRL", role: "Analista de datos", start: "2018-07", end: "2020-12", description: "Dashboards y SQL analytics.", technologies: ["SQL", "Looker"] },
-    ],
-    languages: [{ language: "Español", proficiency: "Nativo" }, { language: "Inglés", proficiency: "Avanzado" }],
-    education: [{ institution: "UNLP", degree: "Lic. en Ciencia de Datos", field: "Datos", start: "2013", end: "2019" }],
-    style: { ...defaultStyle, palette: "ocean" },
-    isFeatured: false,
-  },
-  {
-    id: "demo-devops",
-    slug: "demo-devops",
-    firstName: "Tomás",
-    lastName: "Iglesias",
-    title: "DevOps / SRE Engineer",
-    introduction: "Automatizo infraestructura y hago que los deploy sean aburridos y predecibles.",
-    location: "Chile",
-    country: "Chile",
-    region: "Santiago",
-    city: "Santiago",
-    skills: ["Docker", "Kubernetes", "Terraform", "CI/CD", "AWS", "Linux"],
-    workModes: ["Remoto"],
-    contacts: { linkedin: "https://linkedin.com/in/tomasiglesias" },
-    portfolio: "",
-    experiences: [
-      { company: "CloudFirst", role: "DevOps Engineer", start: "2020-05", current: true, description: "Kubernetes y Terraform en AWS.", technologies: ["K8s", "Terraform", "AWS"] },
-      { company: "MiPyME Tech", role: "SysAdmin", start: "2017-02", end: "2020-04", description: "Servidores Linux y monitoreo.", technologies: ["Linux", "Bash"] },
-    ],
-    languages: [{ language: "Español", proficiency: "Nativo" }, { language: "Inglés", proficiency: "Avanzado" }],
-    education: [],
-    style: { ...defaultStyle, palette: "sunset" },
-    isFeatured: false,
-  },
-];
-
-const modeLabel = (value) => workModeLabel(workModes, value);
-const toggle = toggleValue;
-
 function normalizeProfile(profile) {
   return {
     ...profile,
@@ -219,15 +94,6 @@ function normalizeProfile(profile) {
     languages: normalizeLanguages(profile.languages || []),
     education: profile.education || [],
   };
-}
-
-function filterFallbackProfiles(filters) {
-  const sorted = filterProfiles(demoProfiles, filters, workModes);
-  // Owner-featured profiles are pinned first, mirrored from backend behavior.
-  return sorted.sort((first, second) => {
-    if (first.isFeatured !== second.isFeatured) return first.isFeatured ? -1 : 1;
-    return 0;
-  });
 }
 
 function getCsrfToken() {
@@ -1324,8 +1190,8 @@ function App() {
     sort: "last_name",
   });
   const [page, setPage] = useState(1);
-  const [profiles, setProfiles] = useState(demoProfiles);
-  const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 1, hasNext: false, hasPrevious: false });
+  const [profiles, setProfiles] = useState([]);
+  const [pagination, setPagination] = useState({ page: 1, pages: 0, total: 0, hasNext: false, hasPrevious: false });
   const [account, setAccount] = useState(null);
   const [detail, setDetail] = useState(null);
   const [routeSlug, setRouteSlug] = useState(() => window.location.pathname.match(/^\/developers\/([^/]+)\/?$/)?.[1] || null);
@@ -1371,10 +1237,8 @@ function App() {
       setDetail(loaded);
       applyProfileMetaTags(loaded);
     } catch {
-      const fallback = demoProfiles.find((profile) => profile.slug === slug);
-      setDetail(fallback || null);
-      if (fallback) applyProfileMetaTags(fallback);
-      else setNotice("Ese perfil no está disponible.");
+      setDetail(null);
+      setNotice("Ese perfil no está disponible.");
     }
   }
 
@@ -1419,9 +1283,9 @@ function App() {
         setPagination(data.pagination);
       })
       .catch(() => {
-        const fallback = filterFallbackProfiles(filters);
-        setProfiles(fallback);
-        setPagination({ page: 1, pages: 1, total: fallback.length, hasNext: false, hasPrevious: false });
+        setProfiles([]);
+        setPagination({ page: 1, pages: 0, total: 0, hasNext: false, hasPrevious: false });
+        setNotice("No pudimos cargar el directorio. Intentalo de nuevo.");
       });
   }, [filters, page]);
 
