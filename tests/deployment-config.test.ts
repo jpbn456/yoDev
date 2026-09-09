@@ -8,7 +8,7 @@ describe("deployment routing", () => {
     const config = JSON.parse(await readFile("vercel.json", "utf8")) as {
       outputDirectory: string;
       rewrites: Array<{ source: string; destination: string }>;
-      headers: Array<{ headers: Array<{ key: string }> }>;
+      headers: Array<{ headers: Array<{ key: string; value: string }> }>;
     };
     expect(config.outputDirectory).toBe("frontend/dist");
     expect(config.rewrites[0]).toEqual({ source: "/api/(.*)", destination: "/api?path=$1" });
@@ -16,7 +16,13 @@ describe("deployment routing", () => {
     expect(config.rewrites.at(-1)).toEqual({ source: "/(.*)", destination: "/index.html" });
     expect(config.headers[0]!.headers.map((header) => header.key)).toEqual(expect.arrayContaining([
       "X-Content-Type-Options", "X-Frame-Options", "Referrer-Policy", "Permissions-Policy", "Strict-Transport-Security",
+      "Content-Security-Policy",
     ]));
+    const csp = config.headers[0]!.headers.find((h) => h.key === "Content-Security-Policy")!;
+    expect(csp.value).toContain("default-src 'self'");
+    expect(csp.value).toContain("script-src 'self'");
+    expect(csp.value).toContain("frame-ancestors 'none'");
+    expect(csp.value).toContain("upgrade-insecure-requests");
   });
 
   it.skipIf(!existsSync(".vercel/output/config.json"))("keeps generated API and profile routes ahead of the SPA fallback", async () => {

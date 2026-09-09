@@ -29,14 +29,21 @@ const now = () => new Date().toISOString();
 const empty = () => new Response(null, { status: 204 });
 
 /**
- * In-memory sliding-window rate limiter.
- * NOTE: state is per-isolate — in production Cloudflare may run several isolates,
- * so this is a best-effort first line of defense, not a hard guarantee across instances.
- * Keep windows short and limits low to be effective against casual brute-force/spam.
+ * DB-backed sliding-window rate limiter.
+ * The database is authoritative so the limit is effective across Cloudflare
+ * isolates and Vercel serverless instances. An in-memory Map acts as a cheap
+ * fast-path: when this isolate already knows a key is over-limit within the
+ * current window the DB round-trip is skipped. False negatives from stale
+ * Map entries are self-correcting on the next request.
  */
 const RATE_WINDOW_MS = 15 * 60 * 1000;   // 15 minutes
 const RATE_AUTH_MAX = 10;                // default login/register attempts per window
 const rateBuckets = new Map<string, { hits: number; resetAt: number }>();
+
+/** Clears the in-memory rate-limit fast-path cache. Exported for test isolation. */
+export function resetRateLimits(): void {
+  rateBuckets.clear();
+}
 
 /** Reads the configured auth rate limit from env, falling back to the default. */
 function authMax(env: AppEnv): number {
@@ -44,15 +51,36 @@ function authMax(env: AppEnv): number {
   return Number.isFinite(value) && value > 0 ? value : RATE_AUTH_MAX;
 }
 
-function rateCheck(key: string, max: number = RATE_AUTH_MAX): boolean {
-  const bucket = rateBuckets.get(key);
+async function rateCheck(db: Database, key: string, max: number): Promise<boolean> {
   const nowMs = Date.now();
-  if (!bucket || bucket.resetAt <= nowMs) {
-    rateBuckets.set(key, { hits: 1, resetAt: nowMs + RATE_WINDOW_MS });
+
+  // Fast-path: skip DB round-trip when this isolate already knows the key
+  // exceeded the limit within the current window.
+  const cached = rateBuckets.get(key);
+  if (cached && cached.resetAt > nowMs && cached.hits > max) {
+    return false;
+  }
+
+  // Authoritative DB check
+  const existing = await db.prepare("SELECT hits, reset_at FROM rate_limits WHERE key = ?")
+    .bind(key).first<{ hits: number; reset_at: number }>();
+
+  if (!existing || existing.reset_at <= nowMs) {
+    // Expired or first use — start a fresh window
+    const resetAt = nowMs + RATE_WINDOW_MS;
+    await db.prepare(
+      "INSERT INTO rate_limits (key, hits, reset_at) VALUES (?, 1, ?) ON CONFLICT(key) DO UPDATE SET hits = 1, reset_at = excluded.reset_at",
+    ).bind(key, resetAt).run();
+    rateBuckets.set(key, { hits: 1, resetAt });
     return true;
   }
-  bucket.hits += 1;
-  return bucket.hits <= max;
+
+  // Within window — increment and check
+  const newHits = existing.hits + 1;
+  await db.prepare("UPDATE rate_limits SET hits = ? WHERE key = ?").bind(newHits, key).run();
+  const allowed = newHits <= max;
+  rateBuckets.set(key, { hits: newHits, resetAt: existing.reset_at });
+  return allowed;
 }
 
 function clientKey(request: Request, suffix = "auth"): string {
@@ -130,6 +158,19 @@ const SECURITY_HEADERS: Record<string, string> = {
   "X-Frame-Options": "DENY",
   "Referrer-Policy": "strict-origin-when-cross-origin",
   "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+  "Content-Security-Policy": [
+    "default-src 'self'",
+    "script-src 'self'",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "font-src 'self' https://fonts.gstatic.com data:",
+    "img-src 'self' data: blob:",
+    "connect-src 'self'",
+    "frame-ancestors 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "object-src 'none'",
+    "upgrade-insecure-requests",
+  ].join("; "),
 };
 
 export function respond(response: Response, request: Request, env: AppEnv): Response {
@@ -349,7 +390,7 @@ export async function handleApi(request: Request, env: AppEnv): Promise<Response
     return json({ results: result.results });
   }
   if (path === "/api/auth/register/" && method === "POST") {
-    if (!rateCheck(clientKey(request, "register"), authMax(env))) return error("Demasiados intentos. Esperá unos minutos e intentá de nuevo.", 429);
+    if (!await rateCheck(env.DB, clientKey(request, "register"), authMax(env))) return error("Demasiados intentos. Esperá unos minutos e intentá de nuevo.", 429);
     if (!requireCsrf(request)) return error("Token de seguridad inválido. Recargá la página e intentá de nuevo.", 403);
     const data = await body(request);
     if (!data) return error("El cuerpo debe ser JSON válido.");
@@ -370,7 +411,7 @@ export async function handleApi(request: Request, env: AppEnv): Promise<Response
     return json({ id: userId, email }, 201, { "Set-Cookie": await createSession(userId, request, env) });
   }
   if (path === "/api/auth/login/" && method === "POST") {
-    if (!rateCheck(clientKey(request, "login"), authMax(env))) return error("Demasiados intentos de ingreso. Esperá unos minutos e intentá de nuevo.", 429);
+    if (!await rateCheck(env.DB, clientKey(request, "login"), authMax(env))) return error("Demasiados intentos de ingreso. Esperá unos minutos e intentá de nuevo.", 429);
     if (!requireCsrf(request)) return error("Token de seguridad inválido. Recargá la página e intentá de nuevo.", 403);
     const data = await body(request);
     const email = data ? stringValue(data, "email").toLowerCase() : ""; const password = data ? stringValue(data, "password") : "";

@@ -47,7 +47,7 @@ describe("Turso database contract and migrations", () => {
     const migrations = await client.execute("SELECT COUNT(*) AS total FROM _yodev_migrations");
     const skills = await client.execute("SELECT COUNT(*) AS total FROM skills");
     const users = await client.execute("SELECT COUNT(*) AS total FROM users");
-    expect(Number(migrations.rows[0]!.total)).toBe(7);
+    expect(Number(migrations.rows[0]!.total)).toBe(8);
     expect(Number(skills.rows[0]!.total)).toBe(440);
     expect(Number(users.rows[0]!.total)).toBe(0);
   });
@@ -112,6 +112,8 @@ describe("portable application handler", () => {
     expect(html).toContain('rel="canonical" href="https://yodev.example/developers/ada-lovelace"');
     expect(html).not.toContain('content="\"unsafe&"');
     expect(rendered.headers.get("X-Frame-Options")).toBe("DENY");
+    expect(rendered.headers.get("Content-Security-Policy")).toContain("default-src 'self'");
+    expect(rendered.headers.get("Content-Security-Policy")).toContain("frame-ancestors 'none'");
   });
 
   it("returns the SPA HTML unchanged for an unknown profile slug", async () => {
