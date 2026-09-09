@@ -385,11 +385,11 @@ function AccountDialog({ close, authenticated }) {
     setSubmitting(true);
     setError("");
     try {
-      const result = await api(registering ? "/api/auth/register/" : "/api/auth/login/", {
+      await api(registering ? "/api/auth/register/" : "/api/auth/login/", {
         method: "POST",
         body: JSON.stringify(form),
       });
-      await authenticated(registering, result);
+      await authenticated(registering);
       close();
     } catch (failure) {
       setError(failure.message);
@@ -441,54 +441,6 @@ function AccountDialog({ close, authenticated }) {
         {registering ? "Ya tengo una cuenta" : "No tengo cuenta todavía"}
       </button>
     </Dialog>
-  );
-}
-
-function VerificationNotice({ account, resend, sending }) {
-  if (!account || account.emailVerified) return null;
-  return (
-    <section className="verification-notice" role="status" aria-live="polite">
-      <div>
-        <strong>Tu correo todavía no está confirmado.</strong>
-        <span>Puedes editar y guardar borradores, pero debes confirmar tu correo antes de publicar.</span>
-      </div>
-      <button type="button" onClick={resend} disabled={sending}>
-        {sending ? "Enviando…" : "Reenviar verificación"}
-      </button>
-    </section>
-  );
-}
-
-function VerifyEmailPage() {
-  const token = new URLSearchParams(window.location.search).get("token") || "";
-  const [state, setState] = useState({ status: "loading", message: "Confirmando tu correo…" });
-
-  useEffect(() => {
-    if (!token) {
-      setState({ status: "error", message: "El enlace de verificación no es válido." });
-      return;
-    }
-    api("/api/auth/verify-email/", { method: "POST", body: JSON.stringify({ token }) })
-      .then(() => setState({ status: "success", message: "Tu correo quedó confirmado. Ya puedes publicar tu perfil." }))
-      .catch((failure) => setState({ status: "error", message: failure.message }));
-  }, [token]);
-
-  return (
-    <main className="verification-page">
-      <header className="masthead profile-masthead">
-        <a className="wordmark" href="/">yo<strong>Dev</strong></a>
-      </header>
-      <section className={`verification-result verification-result-${state.status}`} aria-live="polite">
-        <span>{state.status === "loading" ? "Verificando" : state.status === "success" ? "Correo confirmado" : "No pudimos confirmar el correo"}</span>
-        <h1>{state.message}</h1>
-        {state.status !== "loading" && (
-          <div>
-            <a className="primary-action" href="/me/profile/edit">Ir a mi perfil</a>
-            <a className="secondary-action" href="/">Volver al inicio</a>
-          </div>
-        )}
-      </section>
-    </main>
   );
 }
 
@@ -671,7 +623,7 @@ function LanguagePicker({ label, options, selected, onChange }) {
   );
 }
 
-function ProfileEditor({ profile, skillOptions, close, saved, emailVerified }) {
+function ProfileEditor({ profile, skillOptions, close, saved }) {
   const [draft, setDraft] = useState(() => ({ ...profile, languages: normalizeLanguages(profile.languages || []) }));
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -852,12 +804,11 @@ function ProfileEditor({ profile, skillOptions, close, saved, emailVerified }) {
             <input
               type="checkbox"
               checked={draft.isPublished}
-              disabled={!emailVerified && !draft.isPublished}
               onChange={(event) => update("isPublished", event.target.checked)}
             />
             <span>
               <strong>Publicar ahora</strong>
-              {emailVerified || draft.isPublished ? "Tu perfil será visible inmediatamente en el directorio." : "Confirma tu correo para habilitar la publicación. Puedes seguir guardando el perfil como borrador."}
+              Tu perfil será visible inmediatamente en el directorio.
             </span>
           </label>
 
@@ -1324,7 +1275,6 @@ function App() {
   const [editorOpen, setEditorOpen] = useState(() => window.location.pathname === "/me/profile/edit");
   const [adminOpen, setAdminOpen] = useState(false);
   const [filtersCollapsed, setFiltersCollapsed] = useState(false);
-  const [resendingVerification, setResendingVerification] = useState(false);
 
   const editorProfile = account
     ? {
@@ -1447,25 +1397,6 @@ function App() {
     }
   }
 
-  async function resendVerification() {
-    setResendingVerification(true);
-    try {
-      const result = await api("/api/auth/resend-verification/", { method: "POST" });
-      if (result.emailVerified) {
-        await refreshAccount();
-        setNotice("Tu correo ya estaba confirmado.");
-      } else if (result.delivery?.status === "sent") {
-        setNotice("Enviamos un nuevo enlace de verificación. Revisa tu correo.");
-      } else {
-        setNotice("No pudimos enviar el correo. Tu cuenta y tus borradores siguen disponibles; inténtalo nuevamente más tarde.");
-      }
-    } catch (failure) {
-      setNotice(failure.message);
-    } finally {
-      setResendingVerification(false);
-    }
-  }
-
   function profileSaved(profile) {
     setEditorOpen(false);
     setAccount(profile);
@@ -1482,8 +1413,6 @@ function App() {
     window.scrollTo(0, 0);
   }
 
-  if (window.location.pathname === "/verify-email") return <VerifyEmailPage />;
-
   if (editorOpen) return (
     <main className="profile-page editor-page">
       <header className="masthead profile-masthead">
@@ -1491,9 +1420,7 @@ function App() {
         <h1>Mi perfil</h1>
         <button className="back-link" onClick={closeProfile}>Volver al directorio</button>
       </header>
-      <VerificationNotice account={account} resend={resendVerification} sending={resendingVerification} />
-      {notice && <div className="notice" role="status"><span>{notice}</span><button onClick={() => setNotice("")} aria-label="Descartar aviso">Cerrar</button></div>}
-      {account ? <ProfileEditor profile={editorProfile} skillOptions={skillOptions} close={() => openProfile(account.slug)} saved={profileSaved} emailVerified={account.emailVerified} /> : (
+      {account ? <ProfileEditor profile={editorProfile} skillOptions={skillOptions} close={() => openProfile(account.slug)} saved={profileSaved} /> : (
         <div className="profile-loading"><p>Inicia sesión para editar tu perfil.</p><button onClick={() => setAuthOpen(true)}>Iniciar sesión</button></div>
       )}
       {authOpen && <AccountDialog close={() => setAuthOpen(false)} authenticated={() => refreshAccount()} />}
@@ -1506,8 +1433,6 @@ function App() {
         <a className="wordmark" href="/">yo<strong>Dev</strong></a>
         <a className="back-link" href="/" onClick={(event) => { event.preventDefault(); closeProfile(); }}>Volver al directorio</a>
       </header>
-      <VerificationNotice account={account} resend={resendVerification} sending={resendingVerification} />
-      {notice && <div className="notice" role="status"><span>{notice}</span><button onClick={() => setNotice("")} aria-label="Descartar aviso">Cerrar</button></div>}
       {detail ? <ProfileDetail profile={detail} owner={account?.slug === detail.slug} onEdit={startEditing} /> : <div className="profile-loading">{notice || "Cargando perfil…"}</div>}
     </main>
   );
@@ -1529,8 +1454,6 @@ function App() {
           )}
         </nav>
       </header>
-
-      <VerificationNotice account={account} resend={resendVerification} sending={resendingVerification} />
 
       {notice && (
         <div className="notice" role="status">
@@ -1576,11 +1499,7 @@ function App() {
       {authOpen && (
         <AccountDialog
           close={() => setAuthOpen(false)}
-          authenticated={async (registered, result) => {
-            await refreshAccount(registered);
-            if (registered && result.delivery?.status === "sent") setNotice("Cuenta creada. Enviamos un enlace para confirmar tu correo.");
-            if (registered && result.delivery?.status === "failed") setNotice("Cuenta creada, pero no pudimos enviar la verificación. Puedes editar tu borrador y reenviar el correo más tarde.");
-          }}
+          authenticated={(registered) => refreshAccount(registered)}
         />
       )}
       {adminOpen && <AdminPanel close={() => setAdminOpen(false)} />}

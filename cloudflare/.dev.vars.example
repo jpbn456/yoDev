@@ -1,5 +1,2 @@
-# Copy this file to .dev.vars for local configuration. Never commit real keys.
+# Optional: permit a deployed frontend origin when API and frontend differ.
 CORS_ORIGIN=http://localhost:5173
-RESEND_API_KEY=re_replace_with_local_test_key
-EMAIL_FROM=yoDev <confirmations@example.com>
-APP_ORIGIN=http://localhost:5173

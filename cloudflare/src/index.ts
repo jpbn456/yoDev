@@ -1,8 +1,7 @@
 import { hashPassword, randomToken, sha256, verifyPassword } from "./passwords";
-import { sendVerificationEmail, type EmailDeliveryResult } from "./email";
 
 type JsonRecord = Record<string, unknown>;
-type UserRow = { id: number; email: string; first_name: string; last_name: string; is_staff: number; email_verified_at: string | null };
+type UserRow = { id: number; email: string; first_name: string; last_name: string; is_staff: number };
 type ProfileRow = UserRow & {
   profile_id: number; slug: string; professional_title: string; introduction: string; profile_email: string;
   linkedin_url: string; portfolio_url: string; visible_contacts: string; country: string; region: string; city: string;
@@ -20,8 +19,6 @@ const json = (data: unknown, status = 200, headers?: HeadersInit) => Response.js
 const error = (detail: string, status = 400) => json({ detail }, status);
 const now = () => new Date().toISOString();
 const empty = () => new Response(null, { status: 204 });
-const VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
-const VERIFICATION_COOLDOWN_MS = 60 * 1000;
 
 /**
  * In-memory sliding-window rate limiter.
@@ -138,43 +135,9 @@ async function currentUser(request: Request, env: Env): Promise<UserRow | null> 
   const token = cookies(request).get("yodev_session");
   if (!token) return null;
   const session = await env.DB.prepare(
-    "SELECT u.id, u.email, u.first_name, u.last_name, u.is_staff, u.email_verified_at FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ? AND s.expires_at > ?",
+    "SELECT u.id, u.email, u.first_name, u.last_name, u.is_staff FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ? AND s.expires_at > ?",
   ).bind(await sha256(token), now()).first<UserRow>();
   return session || null;
-}
-
-async function markVerificationDelivered(userId: number, tokenHash: string, env: Env): Promise<void> {
-  await env.DB.prepare("UPDATE email_verification_tokens SET delivered_at = ? WHERE user_id = ? AND token_hash = ?")
-    .bind(now(), userId, tokenHash).run();
-}
-
-async function issueVerification(user: Pick<UserRow, "id" | "email" | "first_name">, env: Env, enforceCooldown: boolean): Promise<{ delivery: EmailDeliveryResult; retryAfter?: number }> {
-  const token = randomToken();
-  const tokenHash = await sha256(token);
-  const timestamp = now();
-  const expiresAt = new Date(Date.now() + VERIFICATION_TTL_MS).toISOString();
-  const cooldownCutoff = new Date(Date.now() - VERIFICATION_COOLDOWN_MS).toISOString();
-  const query = enforceCooldown
-    ? `INSERT INTO email_verification_tokens (user_id, token_hash, expires_at, last_attempt_at)
-       VALUES (?, ?, ?, ?)
-       ON CONFLICT(user_id) DO UPDATE SET token_hash = excluded.token_hash, expires_at = excluded.expires_at,
-         last_attempt_at = excluded.last_attempt_at, delivered_at = NULL
-       WHERE email_verification_tokens.last_attempt_at <= ?`
-    : "INSERT INTO email_verification_tokens (user_id, token_hash, expires_at, last_attempt_at) VALUES (?, ?, ?, ?)";
-  const bindings: unknown[] = [user.id, tokenHash, expiresAt, timestamp];
-  if (enforceCooldown) bindings.push(cooldownCutoff);
-  const issued = await env.DB.prepare(query).bind(...bindings).run();
-  if (!issued.meta.changes) return { delivery: { status: "failed", reason: "provider" }, retryAfter: Math.ceil(VERIFICATION_COOLDOWN_MS / 1000) };
-
-  const delivery = await sendVerificationEmail(env, user.email, user.first_name, token);
-  if (delivery.status === "sent") {
-    try {
-      await markVerificationDelivered(user.id, tokenHash, env);
-    } catch (cause) {
-      console.error(JSON.stringify({ event: "verification_delivery_metadata_error", userId: user.id, cause: String(cause) }));
-    }
-  }
-  return { delivery };
 }
 
 async function createSession(userId: number, request: Request, env: Env): Promise<string> {
@@ -288,13 +251,11 @@ async function serialize(row: ProfileRow, env: Env, detail = false, privateField
   if (privateFields) Object.assign(profile, {
     editable: { firstName: row.first_name, lastName: row.last_name, email: row.profile_email, linkedin: row.linkedin_url, visibleContacts: visible, workModes: parseList(row.work_modes), skills: skills.map((skill) => skill.slug), isPublished: Boolean(row.is_published) },
     isAdmin: Boolean(row.is_staff),
-    emailVerified: Boolean(row.email_verified_at),
-    verificationStatus: row.email_verified_at ? "verified" : "pending",
   });
   return profile;
 }
 
-const profileSelect = "SELECT p.id AS profile_id, p.slug, p.professional_title, p.introduction, p.email AS profile_email, p.linkedin_url, p.portfolio_url, p.visible_contacts, p.country, p.region, p.city, p.work_modes, p.palette, p.font, p.layout, p.alignment, p.is_owner_featured, p.is_published, p.is_reviewed, p.reviewed_at, p.updated_at, u.id, u.email, u.first_name, u.last_name, u.is_staff, u.email_verified_at FROM profiles p JOIN users u ON u.id = p.user_id";
+const profileSelect = "SELECT p.id AS profile_id, p.slug, p.professional_title, p.introduction, p.email AS profile_email, p.linkedin_url, p.portfolio_url, p.visible_contacts, p.country, p.region, p.city, p.work_modes, p.palette, p.font, p.layout, p.alignment, p.is_owner_featured, p.is_published, p.is_reviewed, p.reviewed_at, p.updated_at, u.id, u.email, u.first_name, u.last_name, u.is_staff FROM profiles p JOIN users u ON u.id = p.user_id";
 
 async function profileBySlug(slug: string, env: Env, publicOnly = true): Promise<ProfileRow | null> {
   return env.DB.prepare(`${profileSelect} WHERE p.slug = ?${publicOnly ? " AND p.is_published = 1" : ""}`).bind(slug).first<ProfileRow>();
@@ -385,52 +346,22 @@ async function handle(request: Request, env: Env): Promise<Response> {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return error("Ingresá un correo electrónico válido.");
     if (firstName.length > 80 || lastName.length > 80) return error("Nombre y apellido son demasiado largos.");
     const existing = await env.DB.prepare("SELECT 1 FROM users WHERE email = ?").bind(email).first();
-    if (existing) {
-      await hashPassword(password);
-      return error("No pudimos crear la cuenta con esos datos.");
-    }
-    const user = await env.DB.prepare("INSERT INTO users (email, password_hash, first_name, last_name, email_verified_at) VALUES (?, ?, ?, ?, NULL)")
+    if (existing) return error("Ya existe una cuenta con ese correo.");
+    const user = await env.DB.prepare("INSERT INTO users (email, password_hash, first_name, last_name) VALUES (?, ?, ?, ?)")
       .bind(email, await hashPassword(password), firstName, lastName).run();
     const userId = Number(user.meta.last_row_id);
     await env.DB.prepare("INSERT INTO profiles (user_id, slug, professional_title, introduction, email, created_at, updated_at) VALUES (?, ?, 'Developer', '', ?, ?, ?)")
       .bind(userId, await uniqueSlug(firstName, lastName, env), email, now(), now()).run();
-    const verification = await issueVerification({ id: userId, email, first_name: firstName }, env, false);
-    return json({ id: userId, email, emailVerified: false, verificationStatus: "pending", delivery: verification.delivery }, 201, { "Set-Cookie": await createSession(userId, request, env) });
+    return json({ id: userId, email }, 201, { "Set-Cookie": await createSession(userId, request, env) });
   }
   if (path === "/api/auth/login/" && method === "POST") {
     if (!rateCheck(clientKey(request, "login"), authMax(env))) return error("Demasiados intentos de ingreso. Esperá unos minutos e intentá de nuevo.", 429);
     if (!requireCsrf(request)) return error("Token de seguridad inválido. Recargá la página e intentá de nuevo.", 403);
     const data = await body(request);
     const email = data ? stringValue(data, "email").toLowerCase() : ""; const password = data ? stringValue(data, "password") : "";
-    const user = await env.DB.prepare("SELECT id, email, password_hash, email_verified_at FROM users WHERE email = ?").bind(email).first<{ id: number; email: string; password_hash: string; email_verified_at: string | null }>();
+    const user = await env.DB.prepare("SELECT id, email, password_hash FROM users WHERE email = ?").bind(email).first<{ id: number; email: string; password_hash: string }>();
     if (!user || !(await verifyPassword(password, user.password_hash))) return error("Correo o contraseña incorrectos.", 401);
-    return json({ id: user.id, email: user.email, emailVerified: Boolean(user.email_verified_at), verificationStatus: user.email_verified_at ? "verified" : "pending" }, 200, { "Set-Cookie": await createSession(user.id, request, env) });
-  }
-  if (path === "/api/auth/verify-email/" && method === "POST") {
-    if (!requireCsrf(request)) return error("Token de seguridad inválido. Recargá la página e intentá de nuevo.", 403);
-    const data = await body(request);
-    const token = data ? stringValue(data, "token") : "";
-    if (!token || token.length > 256) return error("El enlace de verificación no es válido o venció.", 400);
-    const tokenHash = await sha256(token);
-    const pending = await env.DB.prepare("SELECT user_id FROM email_verification_tokens WHERE token_hash = ? AND expires_at > ?")
-      .bind(tokenHash, now()).first<{ user_id: number }>();
-    if (!pending) return error("El enlace de verificación no es válido o venció.", 400);
-    const results = await env.DB.batch([
-      env.DB.prepare("UPDATE users SET email_verified_at = COALESCE(email_verified_at, ?) WHERE id = ? AND EXISTS (SELECT 1 FROM email_verification_tokens WHERE user_id = ? AND token_hash = ? AND expires_at > ?)")
-        .bind(now(), pending.user_id, pending.user_id, tokenHash, now()),
-      env.DB.prepare("DELETE FROM email_verification_tokens WHERE user_id = ?").bind(pending.user_id),
-    ]);
-    if (!results[0]?.meta.changes) return error("El enlace de verificación no es válido o venció.", 400);
-    return json({ emailVerified: true, verificationStatus: "verified" });
-  }
-  if (path === "/api/auth/resend-verification/" && method === "POST") {
-    if (!requireCsrf(request)) return error("Token de seguridad inválido. Recargá la página e intentá de nuevo.", 403);
-    const user = await currentUser(request, env);
-    if (!user) return error("Iniciá sesión para reenviar la verificación.", 401);
-    if (user.email_verified_at) return json({ emailVerified: true, verificationStatus: "verified" });
-    const verification = await issueVerification(user, env, true);
-    if (verification.retryAfter) return json({ detail: "Esperá un minuto antes de solicitar otro correo.", retryAfter: verification.retryAfter }, 429);
-    return json({ emailVerified: false, verificationStatus: "pending", delivery: verification.delivery });
+    return json({ id: user.id, email: user.email }, 200, { "Set-Cookie": await createSession(user.id, request, env) });
   }
   if (path === "/api/auth/logout/" && method === "POST") {
     if (!requireCsrf(request)) return error("Token de seguridad inválido.", 403);
@@ -459,7 +390,6 @@ async function handle(request: Request, env: Env): Promise<Response> {
     const title = stringValue(data, "title", profile.professional_title); const introduction = stringValue(data, "introduction", profile.introduction);
     const published = data.isPublished === undefined ? Boolean(profile.is_published) : Boolean(data.isPublished);
     if (published && !title) return error("Completá el título antes de publicar el perfil.");
-    if (published && !profile.is_published && !user.email_verified_at) return error("Confirma tu correo antes de publicar el perfil.", 403);
     const style = typeof data.style === "object" && data.style !== null ? data.style as JsonRecord : {};
     const styleValue = (key: string, allowed: string[], fallback: string) => typeof style[key] === "string" && allowed.includes(style[key] as string) ? style[key] as string : fallback;
     const email = stringValue(data, "email", profile.profile_email); const timestamp = now();

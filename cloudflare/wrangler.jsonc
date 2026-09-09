@@ -15,12 +15,7 @@
   },
   "vars": {
     "CORS_ORIGIN": "http://localhost:5173,https://yodev-api.primera-fila-s.workers.dev",
-    "RATE_AUTH_MAX": "10",
-    "APP_ORIGIN": "https://yodev-api.primera-fila-s.workers.dev",
-    "EMAIL_FROM": "yoDev <onboarding@resend.dev>"
-  },
-  "secrets": {
-    "required": ["RESEND_API_KEY"]
+    "RATE_AUTH_MAX": "10"
   },
   "d1_databases": [
     {
