@@ -276,7 +276,7 @@ function Field({ label, value, setValue, textarea = false, type = "text", requir
 function SelectField({ label, value, setValue, options }) {
   const id = useId();
   return (
-    <label className="field" htmlFor={id}>
+    <label className="field">
       <span>{label}</span>
       <select id={id} aria-label={label} value={value} onChange={(event) => setValue(event.target.value)}>
         {options.map((option) => (
