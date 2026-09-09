@@ -14,6 +14,7 @@
     "head_sampling_rate": 1
   },
   "vars": {
+    "APP_ORIGIN": "https://yodev-api.primera-fila-s.workers.dev",
     "CORS_ORIGIN": "http://localhost:5173,https://yodev-api.primera-fila-s.workers.dev",
     "RATE_AUTH_MAX": "10"
   },
@@ -24,5 +25,23 @@
       "database_id": "e9c14e1d-a125-4ed4-b33c-8d6d7862e795",
       "migrations_dir": "migrations"
     }
-  ]
+  ],
+  "env": {
+    "test": {
+      "name": "yodev-api-test",
+      "vars": {
+        "APP_ORIGIN": "https://yodev-api-test.primera-fila-s.workers.dev",
+        "CORS_ORIGIN": "https://yodev-api-test.primera-fila-s.workers.dev",
+        "RATE_AUTH_MAX": "10"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "yodev-test",
+          "database_id": "8707d7ee-c0b1-45c6-b5ad-c4142ffb31af",
+          "migrations_dir": "migrations"
+        }
+      ]
+    }
+  }
 }
