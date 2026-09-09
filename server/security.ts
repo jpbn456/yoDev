@@ -1,6 +1,5 @@
 const encoder = new TextEncoder();
-// Workers' crypto.subtle (BoringSSL) rejects PBKDF2 iteration counts above 100_000.
-// Use the max allowed to keep hashing strong while remaining deployable.
+// Keep hashes portable between the Workers Web Crypto runtime and Node.js Web Crypto.
 const ITERATIONS = 100_000;
 
 function base64url(bytes: Uint8Array): string {
@@ -9,19 +8,19 @@ function base64url(bytes: Uint8Array): string {
   return btoa(text).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
 }
 
-function fromBase64url(value: string): Uint8Array {
+function fromBase64url(value: string): Uint8Array<ArrayBuffer> {
   const padded = value.replaceAll("-", "+").replaceAll("_", "/") + "=".repeat((4 - (value.length % 4)) % 4);
-  return Uint8Array.from(atob(padded), (character) => character.charCodeAt(0));
+  return Uint8Array.from(atob(padded), (character) => character.charCodeAt(0)) as Uint8Array<ArrayBuffer>;
 }
 
-async function derive(password: string, salt: Uint8Array): Promise<Uint8Array> {
+async function derive(password: string, salt: Uint8Array<ArrayBuffer>): Promise<Uint8Array<ArrayBuffer>> {
   const key = await crypto.subtle.importKey("raw", encoder.encode(password), "PBKDF2", false, ["deriveBits"]);
   const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt, iterations: ITERATIONS }, key, 256);
   return new Uint8Array(bits);
 }
 
 export async function hashPassword(password: string): Promise<string> {
-  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const salt = crypto.getRandomValues(new Uint8Array(16)) as Uint8Array<ArrayBuffer>;
   return `pbkdf2_sha256$${ITERATIONS}$${base64url(salt)}$${base64url(await derive(password, salt))}`;
 }
 

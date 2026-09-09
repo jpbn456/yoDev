@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { DatabaseSync } from "node:sqlite";
 import { readFileSync } from "node:fs";
 import worker from "./index.ts";
-import { sha256 } from "./passwords.ts";
+import { sha256 } from "../../server/security.ts";
 
 // Execute the actual handler and SQL against an isolated SQLite database.
 // This adapter covers the D1 methods used here, not the Workers runtime itself.
