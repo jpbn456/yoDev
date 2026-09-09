@@ -76,6 +76,16 @@ export function workModeLabel(workModes, value) {
 }
 
 /**
+ * Parse comma-separated tag text into a trimmed list of non-empty tags.
+ * Use this only when committing finished input (blur/submit), NOT on every
+ * keystroke: parsing mid-typing makes a trailing comma disappear, so the
+ * user can never separate values.
+ */
+export function parseTags(text) {
+  return (text || "").split(",").map((tag) => tag.trim()).filter(Boolean);
+}
+
+/**
  * Toggle a value in an array (add if absent, remove if present).
  */
 export function toggleValue(values, value) {

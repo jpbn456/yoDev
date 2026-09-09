@@ -8,7 +8,30 @@ import {
   optionsWithLegacy,
   normalizeLanguages,
   formatEducationPeriod,
+  parseTags,
 } from "./profileUtils.js";
+
+describe("parseTags", () => {
+  it("splits comma-separated text into trimmed non-empty tags", () => {
+    expect(parseTags("Python, Django, SQL")).toEqual(["Python", "Django", "SQL"]);
+  });
+
+  it("does not choke on a trailing comma while typing", () => {
+    expect(parseTags("Python,")).toEqual(["Python"]);
+    expect(parseTags("Python, ")).toEqual(["Python"]);
+  });
+
+  it("ignores empty chunks and whitespace-only input", () => {
+    expect(parseTags(", ,")).toEqual([]);
+    expect(parseTags("   ")).toEqual([]);
+    expect(parseTags("")).toEqual([]);
+    expect(parseTags(undefined)).toEqual([]);
+  });
+
+  it("trims surrounding whitespace from each tag", () => {
+    expect(parseTags("  React  ,  Node.js ,TypeScript  ")).toEqual(["React", "Node.js", "TypeScript"]);
+  });
+});
 
 describe("education periods", () => {
   it("labels only explicitly current education as ongoing", () => {

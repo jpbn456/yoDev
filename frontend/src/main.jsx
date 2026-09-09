@@ -1,8 +1,8 @@
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { QRCodeSVG } from "qrcode.react";
 import { fallbackSkills } from "./fallbackSkills.js";
-import { calculateYears, workModeLabel, toggleValue, filterProfiles, proficiencyOptions, optionsWithLegacy, normalizeLanguages, formatEducationPeriod } from "./lib/profileUtils.js";
+import { calculateYears, workModeLabel, toggleValue, filterProfiles, proficiencyOptions, optionsWithLegacy, normalizeLanguages, formatEducationPeriod, parseTags } from "./lib/profileUtils.js";
 import "./styles.css";
 
 const workModes = [
@@ -285,6 +285,49 @@ function SelectField({ label, value, setValue, options }) {
           </option>
         ))}
       </select>
+    </label>
+  );
+}
+
+/**
+ * Comma-separated tags input. Keeps the raw text in local state so the
+ * user can actually type commas; the parsed array is committed only on
+ * blur or Enter. Parsing on every keystroke (value=tags.join(", ")) makes
+ * a trailing comma disappear and the field becomes unusable for lists.
+ */
+function TagsField({ label, value, setValue, hint }) {
+  const [text, setText] = useState(() => value.join(", "));
+  const focused = useRef(false);
+
+  // Re-sync the raw text when the item changes externally (e.g. loading a
+  // saved profile), but never while the user is typing inside this field.
+  useEffect(() => {
+    if (!focused.current) setText(value.join(", "));
+  }, [value]);
+
+  function commit() {
+    const parsed = parseTags(text);
+    setValue(parsed);
+  }
+
+  return (
+    <label className="field">
+      <span>{label}</span>
+      <input
+        type="text"
+        value={text}
+        onChange={(event) => setText(event.target.value)}
+        onFocus={() => { focused.current = true; }}
+        onBlur={() => { focused.current = false; commit(); }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            commit();
+            event.currentTarget.blur();
+          }
+        }}
+      />
+      {hint && <small>{hint}</small>}
     </label>
   );
 }
@@ -715,7 +758,7 @@ function ProfileEditor({ profile, skillOptions, close, saved }) {
               </div>
               <label className="inline-check"><input type="checkbox" checked={item.current} onChange={(event) => change("current", event.target.checked)} /> Actualmente</label>
               <Field label="Descripción" textarea value={item.description} setValue={(value) => change("description", value)} />
-              <Field label="Tecnologías" value={item.technologies.join(", ")} setValue={(value) => change("technologies", value.split(",").map((technology) => technology.trim()).filter(Boolean))} hint="Separalas con comas." />
+              <TagsField label="Tecnologías" value={item.technologies} setValue={(value) => change("technologies", value)} hint="Separá con comas: Python, Django, SQL." />
             </>}
           </RepeatableSection>
 
