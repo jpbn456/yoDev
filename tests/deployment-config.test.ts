@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
 
 describe("deployment routing", () => {
   it("routes profile SEO before the SPA fallback and applies security headers", async () => {
@@ -50,6 +51,27 @@ describe("deployment routing", () => {
     expect(config.handler).toBe("api/profile-seo.js");
     expect(config.filePathMap?.["frontend/dist/index.html"]).toBe("frontend/dist/index.html");
     expect(bundledSource).toContain('new URL("../frontend/dist/index.html", import.meta.url)');
+  });
+
+  it.skipIf(!existsSync(".vercel/output/functions/api/index.func/.vc-config.json"))("packages the shared server modules into every API function bundle with resolvable imports", async () => {
+    for (const entry of ["index", "profile-seo"]) {
+      const funcDir = `.vercel/output/functions/api/${entry}.func`;
+      // The shared server entrypoints must physically exist inside the packaged function.
+      for (const moduleName of ["application", "turso", "security"]) {
+        expect(existsSync(`${funcDir}/server/${moduleName}.js`), `${funcDir}/server/${moduleName}.js`).toBe(true);
+      }
+      // Every relative import in the bundled handler must resolve to a file present in the
+      // same bundle, or Node ESM fails at runtime with ERR_MODULE_NOT_FOUND (as on yodev-psi).
+      const bundledSource = await readFile(`${funcDir}/api/${entry}.js`, "utf8");
+      const relativeImports = [...bundledSource.matchAll(/from "(\.[^"]+)"/g)].map((match) => match[1]);
+      expect(relativeImports.length).toBeGreaterThan(0);
+      for (const specifier of relativeImports) {
+        expect(existsSync(resolve(funcDir, "api", specifier)), `${funcDir}/api/${entry}.js imports ${specifier}`).toBe(true);
+      }
+      expect(bundledSource).toContain('from "../server/application.js"');
+      expect(bundledSource).toContain('from "../server/turso.js"');
+      expect(bundledSource).toContain('from "./_request.js"');
+    }
   });
 
   it("keeps the Cloudflare test database isolated with its configured resource identity", async () => {

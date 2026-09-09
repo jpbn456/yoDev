@@ -1,8 +1,8 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { readFile } from "node:fs/promises";
-import { injectProfileMeta, respond, type AppEnv } from "../server/application";
-import { createTursoClientFromEnv, createTursoDatabase } from "../server/turso";
-import { sendWebResponse, toWebRequest } from "./_request";
+import { injectProfileMeta, respond, type AppEnv } from "../server/application.js";
+import { createTursoClientFromEnv, createTursoDatabase } from "../server/turso.js";
+import { sendWebResponse, toWebRequest } from "./_request.js";
 
 export default async function handler(request: VercelRequest, response: VercelResponse): Promise<void> {
   try {

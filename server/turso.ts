@@ -1,5 +1,5 @@
 import { createClient, type Client, type InStatement, type ResultSet, type Value } from "@libsql/client";
-import type { Database, DatabaseValue, PreparedStatement, RunResult } from "./database";
+import type { Database, DatabaseValue, PreparedStatement, RunResult } from "./database.js";
 
 function inputValue(value: DatabaseValue): Value {
   if (typeof value === "boolean") return Number(value);

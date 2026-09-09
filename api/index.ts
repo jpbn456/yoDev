@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { handleApi, respond, type AppEnv } from "../server/application";
-import { createTursoClientFromEnv, createTursoDatabase } from "../server/turso";
-import { sendWebResponse, toApiWebRequest } from "./_request";
+import { handleApi, respond, type AppEnv } from "../server/application.js";
+import { createTursoClientFromEnv, createTursoDatabase } from "../server/turso.js";
+import { sendWebResponse, toApiWebRequest } from "./_request.js";
 
 export default async function handler(request: VercelRequest, response: VercelResponse): Promise<void> {
   let webRequest: Request | undefined;

@@ -1,5 +1,5 @@
-import { hashPassword, randomToken, sha256, verifyPassword } from "./security";
-import type { Database, DatabaseValue, PreparedStatement } from "./database";
+import { hashPassword, randomToken, sha256, verifyPassword } from "./security.js";
+import type { Database, DatabaseValue, PreparedStatement } from "./database.js";
 
 export type AppEnv = {
   DB: Database;
