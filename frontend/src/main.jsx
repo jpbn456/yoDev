@@ -11,6 +11,8 @@ const workModes = [
   { value: "onsite", label: "In-site" },
 ];
 
+const modeLabel = (value) => workModeLabel(workModes, value);
+
 const commonLanguages = [
   "Español",
   "Inglés",
