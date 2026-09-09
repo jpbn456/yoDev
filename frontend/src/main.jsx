@@ -926,7 +926,6 @@ function ProfileDetail({ profile, owner = false, onEdit }) {
             <h2>{profile.firstName} <em>{profile.lastName}</em></h2>
           </div>
 
-          <p className="profile-introduction">{profile.introduction}</p>
           <div className="resume-meta">
             <span>{profile.location || "Ubicación abierta"}</span>
             <span>{profile.workModes.join(" · ") || "Modalidad a conversar"}</span>
@@ -936,6 +935,11 @@ function ProfileDetail({ profile, owner = false, onEdit }) {
 
         <div className="resume-content">
           <div className="resume-main-column">
+            <section className="resume-section">
+              <h2>Presentación</h2>
+              <p className="profile-introduction">{profile.introduction || "Sin presentación cargada."}</p>
+            </section>
+
             <section className="resume-section">
               <h2>Experiencia</h2>
               <div className="timeline-list">

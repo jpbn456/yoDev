@@ -2259,7 +2259,6 @@ textarea:focus-visible {
 .resume-profile.align-center .resume-hero { text-align: center; }
 .resume-profile.align-center .virtual-card-heading h2 { margin-inline: auto; }
 .resume-profile.layout-centered .resume-hero { grid-template-columns: minmax(0, 1fr); gap: 1.5rem; }
-.resume-profile.layout-centered .profile-introduction { max-width: none; }
 .resume-profile.layout-compact .resume-hero { padding: 1.5rem; gap: 1.5rem; }
 .resume-profile.layout-compact .resume-content { padding: 1.5rem; gap: 1.5rem; }
 .resume-profile.layout-compact .virtual-card-heading h2 { font-size: clamp(2rem, 5vw, 4rem); }
@@ -2318,13 +2317,12 @@ textarea:focus-visible {
   font-size: clamp(3.2rem, 7vw, 6rem);
 }
 
-.resume-hero .profile-introduction {
-  max-width: 62ch;
+.resume-main-column .profile-introduction {
+  max-width: 72ch;
   margin: 0;
-  color: color-mix(in srgb, var(--accent), #101538 32%);
-  font-size: clamp(1rem, 1.6vw, 1.3rem);
-  font-weight: 600;
-  line-height: 1.55;
+  color: #42475f;
+  font-size: 0.95rem;
+  line-height: 1.7;
 }
 
 .resume-meta {
