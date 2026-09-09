@@ -82,7 +82,14 @@ describe("deployment routing", () => {
 
   it("keeps the Cloudflare test database isolated with its configured resource identity", async () => {
     const source = await readFile("cloudflare/wrangler.jsonc", "utf8");
-    const config = JSON.parse(source) as { env: { test: { name: string; d1_databases: Array<{ binding: string; database_name: string; database_id: string }> } } };
+    const config = JSON.parse(source) as {
+      assets?: { run_worker_first?: boolean };
+      env: { test: { name: string; d1_databases: Array<{ binding: string; database_name: string; database_id: string }> } };
+    };
+    // Static assets MUST pass through the Worker so respond() applies security
+    // headers (CSP, frame-ancestors, etc.). Without run_worker_first the asset
+    // system serves index.html directly from the CDN cache and skips the Worker.
+    expect(config.assets?.run_worker_first).toBe(true);
     const testDatabase = config.env.test.d1_databases[0]!;
     expect(config.env.test.name).toBe("yodev-api-test");
     expect(testDatabase).toEqual(expect.objectContaining({
