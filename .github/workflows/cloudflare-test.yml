@@ -37,15 +37,15 @@ jobs:
         run: npx vitest run tests
       - name: Typecheck Vercel and shared server
         run: npx tsc --noEmit
+      - name: Build frontend
+        run: npm run build
+        working-directory: frontend
       - name: Test Worker
         run: npm test
         working-directory: cloudflare
       - name: Typecheck Worker
         run: npm run typecheck
         working-directory: cloudflare
-      - name: Build frontend
-        run: npm run build
-        working-directory: frontend
       - name: Apply isolated D1 migrations
         run: npx wrangler d1 migrations apply yodev-test --env test --remote
         working-directory: cloudflare
