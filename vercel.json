@@ -22,6 +22,7 @@
     }
   ],
   "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api?path=$1" },
     { "source": "/developers/:slug", "destination": "/api/profile-seo?slug=:slug" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]

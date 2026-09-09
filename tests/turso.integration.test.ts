@@ -113,4 +113,17 @@ describe("portable application handler", () => {
     expect(html).not.toContain('content="\"unsafe&"');
     expect(rendered.headers.get("X-Frame-Options")).toBe("DENY");
   });
+
+  it("returns the SPA HTML unchanged for an unknown profile slug", async () => {
+    const template = '<!doctype html><html><head><title>yoDev</title></head><body><div id="root"></div></body></html>';
+    const rendered = await injectProfileMeta(
+      new Response(template, { headers: { "Content-Type": "text/html; charset=utf-8" } }),
+      "/developers/nonexistent",
+      request("/developers/nonexistent"),
+      env,
+    );
+
+    expect(rendered.status).toBe(200);
+    expect(await rendered.text()).toBe(template);
+  });
 });

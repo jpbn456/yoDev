@@ -6,10 +6,13 @@ function protocol(request: VercelRequest): string {
   return (Array.isArray(forwarded) ? forwarded[0] : forwarded)?.split(",")[0]?.trim() || "https";
 }
 
-export function toWebRequest(request: VercelRequest): Request {
+function requestUrl(request: VercelRequest): URL {
   const host = request.headers["x-forwarded-host"] || request.headers.host || "localhost";
   const hostname = Array.isArray(host) ? host[0] : host;
-  const url = new URL(request.url || "/", `${protocol(request)}://${hostname}`);
+  return new URL(request.url || "/", `${protocol(request)}://${hostname}`);
+}
+
+export function toWebRequest(request: VercelRequest, url = requestUrl(request)): Request {
   const headers = new Headers();
   for (const [name, value] of Object.entries(request.headers)) {
     if (Array.isArray(value)) value.forEach((item) => headers.append(name, item));
@@ -28,6 +31,15 @@ export function toWebRequest(request: VercelRequest): Request {
       : JSON.stringify(request.body);
   }
   return new Request(url, { method, headers, body, signal: abort.signal });
+}
+
+export function toApiWebRequest(request: VercelRequest): Request {
+  const routedPath = request.query.path;
+  const path = (Array.isArray(routedPath) ? routedPath.join("/") : routedPath || "").replace(/^\/+/, "");
+  const url = requestUrl(request);
+  url.pathname = `/api/${path}`;
+  url.searchParams.delete("path");
+  return toWebRequest(request, url);
 }
 
 export async function sendWebResponse(response: Response, target: VercelResponse): Promise<void> {

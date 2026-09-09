@@ -1,6 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { readFile } from "node:fs/promises";
-import { join } from "node:path";
 import { injectProfileMeta, respond, type AppEnv } from "../server/application";
 import { createTursoClientFromEnv, createTursoDatabase } from "../server/turso";
 import { sendWebResponse, toWebRequest } from "./_request";
@@ -9,7 +8,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
   try {
     const webRequest = toWebRequest(request);
     const slug = typeof request.query.slug === "string" ? request.query.slug : "";
-    const template = await readFile(join(process.cwd(), "frontend", "dist", "index.html"), "utf8");
+    const template = await readFile(new URL("../frontend/dist/index.html", import.meta.url), "utf8");
     const client = createTursoClientFromEnv();
     try {
       const env: AppEnv = { DB: createTursoDatabase(client), APP_ORIGIN: process.env.APP_ORIGIN };

@@ -1,12 +1,12 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { handleApi, respond, type AppEnv } from "../server/application";
 import { createTursoClientFromEnv, createTursoDatabase } from "../server/turso";
-import { sendWebResponse, toWebRequest } from "./_request";
+import { sendWebResponse, toApiWebRequest } from "./_request";
 
 export default async function handler(request: VercelRequest, response: VercelResponse): Promise<void> {
   let webRequest: Request | undefined;
   try {
-    webRequest = toWebRequest(request);
+    webRequest = toApiWebRequest(request);
     const client = createTursoClientFromEnv();
     try {
       const env: AppEnv = { DB: createTursoDatabase(client), APP_ORIGIN: process.env.APP_ORIGIN, RATE_AUTH_MAX: process.env.RATE_AUTH_MAX };
