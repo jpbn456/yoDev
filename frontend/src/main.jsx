@@ -1210,7 +1210,7 @@ function PublicFilters({ skills, filters, setFilters, collapsed, onToggleFilters
   );
 }
 
-const BASE_URL = "https://yodev-api.primera-fila-s.workers.dev";
+const BASE_URL = window.location.origin;
 
 function setMeta(attribute, name, content) {
   let element = document.head.querySelector(`meta[${attribute}="${name}"]`);
@@ -1226,11 +1226,22 @@ function setTitle(title) {
   document.title = title;
 }
 
+function setCanonical(url) {
+  let element = document.head.querySelector('link[rel="canonical"]');
+  if (!element) {
+    element = document.createElement("link");
+    element.setAttribute("rel", "canonical");
+    document.head.appendChild(element);
+  }
+  element.setAttribute("href", url);
+}
+
 function resetMetaTags() {
   setTitle("yoDev — El board de quienes construyen lo que sigue");
   setMeta("property", "og:title", "yoDev — El board de quienes construyen lo que sigue");
   setMeta("property", "og:description", "Directorio público de desarrolladores. Creá tu tarjeta profesional y descubrí perfiles por habilidades, ubicación y modalidad.");
   setMeta("property", "og:url", `${BASE_URL}/`);
+  setCanonical(`${BASE_URL}/`);
   setMeta("name", "description", "Directorio público de desarrolladores. Creá tu tarjeta profesional, descubrí perfiles por habilidades, ubicación y modalidad, y compartí tu perfil con código QR.");
 }
 
@@ -1246,6 +1257,7 @@ function applyProfileMetaTags(profile) {
   setMeta("property", "og:title", titleText);
   setMeta("property", "og:description", description);
   setMeta("property", "og:url", url);
+  setCanonical(url);
   setMeta("property", "og:type", "profile");
   setMeta("property", "profile:first_name", profile.firstName);
   setMeta("property", "profile:last_name", profile.lastName);
