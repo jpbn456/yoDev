@@ -131,6 +131,77 @@ textarea:focus-visible {
   text-decoration: underline;
 }
 
+.verification-notice {
+  max-width: 1380px;
+  margin: 1rem auto 0;
+  padding: 1rem 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border: 1px solid #e5bf78;
+  border-radius: var(--control-radius);
+  background: #fff6df;
+  color: #654710;
+}
+
+.verification-notice > div {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+}
+
+.verification-notice button {
+  flex: none;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid currentColor;
+  border-radius: var(--control-radius);
+  background: transparent;
+  color: inherit;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.verification-notice button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.verification-result {
+  width: min(720px, calc(100% - 2rem));
+  margin: 8vh auto;
+  padding: clamp(2rem, 6vw, 4rem);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: white;
+  box-shadow: var(--card-shadow);
+}
+
+.verification-result > span {
+  color: var(--blue);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.verification-result h1 {
+  margin: 0.8rem 0 2rem;
+  font-size: clamp(1.8rem, 5vw, 3.2rem);
+  line-height: 1.05;
+}
+
+.verification-result > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.verification-result a {
+  display: inline-block;
+  text-decoration: none;
+}
+
 .intro {
   max-width: 1480px;
   margin: auto;
@@ -1270,6 +1341,16 @@ textarea:focus-visible {
 
   .masthead nav {
     gap: 0.85rem;
+  }
+
+  .verification-notice {
+    margin-inline: 1rem;
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .verification-notice button {
+    width: 100%;
   }
 
   .masthead nav > a {

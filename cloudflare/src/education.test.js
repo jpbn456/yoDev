@@ -35,6 +35,7 @@ beforeEach(async () => {
   database.exec("INSERT INTO users (email, password_hash, first_name, last_name) VALUES ('test@example.test', '', 'Test', 'User'); INSERT INTO profiles (user_id, slug, is_published) VALUES (1, 'test-user', 1); INSERT INTO profile_education (profile_id, sort_order, institution, start_date) VALUES (1, 0, 'Legacy School', '2020-03');");
   database.prepare("INSERT INTO sessions (user_id, token_hash, expires_at) VALUES (1, ?, '2099-01-01')").run(await sha256("test-session"));
   migration("0006_education_current.sql");
+  migration("0007_email_verification.sql");
   env = { DB: { prepare, async batch(statements) {
     database.exec("BEGIN");
     try { const results = await Promise.all(statements.map((statement) => statement.run())); database.exec("COMMIT"); return results; }
