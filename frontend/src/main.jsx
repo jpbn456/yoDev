@@ -394,7 +394,6 @@ function ProfileCard({ profile, open, preview = false }) {
           </h2>
           {profile.location && <span className="location">{profile.location}</span>}
         </span>
-        {profile.introduction && <span className="card-introduction">{profile.introduction}</span>}
         <div className="skill-row">
           {(profile.skills || []).slice(0, 4).map((skill) => (
             <span key={skill}>{skill}</span>
@@ -735,6 +734,7 @@ function ProfileEditor({ profile, skillOptions, close, saved }) {
               textarea
               value={draft.introduction}
               setValue={(value) => update("introduction", value)}
+              hint="Se muestra dentro de tu perfil público, en la cabecera. No se repite en la tarjeta."
             />
           </section>
 

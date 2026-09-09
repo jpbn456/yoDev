@@ -1690,14 +1690,6 @@ textarea:focus-visible {
   font-size: 0.65rem;
 }
 
-.card-introduction {
-  grid-column: 1 / -1;
-  min-height: 2.7em;
-  color: #42475f;
-  font-size: 0.68rem;
-  line-height: 1.45;
-}
-
 .card-main > .skill-row {
   grid-column: 1 / -1;
   margin-top: 0.25rem;
