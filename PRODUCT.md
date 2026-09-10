@@ -8,7 +8,7 @@ web
 
 ## Stack
 
-Python/Django API and administration, React/TypeScript client, PostgreSQL in production. The stack was explicitly selected by the product owner.
+React/Vite frontend with a shared TypeScript server. Production runs on Vercel with Turso/libSQL; the isolated test environment runs on a Cloudflare Worker with D1.
 
 ## Users
 

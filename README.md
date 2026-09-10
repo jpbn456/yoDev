@@ -1,13 +1,13 @@
 # yoDev
 
-yoDev is a React/Vite developer directory with one portable application layer and two isolated deployment targets:
+yoDev is a React/Vite developer directory backed by a shared TypeScript server and two isolated database targets:
 
 | Branch | Platform | Database | Purpose |
 | --- | --- | --- | --- |
 | `main` | Vercel | Turso/libSQL | Production application |
 | `test` | Cloudflare Worker | Isolated D1 `yodev-test` | Test environment |
 
-The legacy Django application is retained only as historical code. It is not part of either deployment.
+The Vercel production runtime uses Turso/libSQL. The Cloudflare test runtime reuses the shared application layer through a Worker adapter backed by D1.
 
 ## Local setup
 
@@ -26,7 +26,7 @@ Create and migrate an isolated local libSQL database without production credenti
 npm run db:migrate:local
 ```
 
-The migration runner tracks applied files in `_yodev_migrations`, applies each migration transactionally, and is safe to rerun. A fresh database receives schema history `0001` through `0007` and exactly the skill catalog from those migrations. Migration `0007` remains inert application history: there is no email verification flow and no email provider integration. The runner never copies users, profiles, or sessions.
+The migration runner tracks applied files in `_yodev_migrations`, applies each migration transactionally, and is safe to rerun. A fresh database receives schema history `0001` through `0009` and exactly the skill catalog from those migrations. Migration `0007` remains inert application history: there is no email verification flow and no email provider integration. The runner never copies users, profiles, or sessions.
 
 ## Production: `main` to Vercel
 
