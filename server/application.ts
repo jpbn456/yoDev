@@ -14,7 +14,7 @@ type ProfileRow = UserRow & {
   profile_id: number; slug: string; professional_title: string; introduction: string; profile_email: string;
   linkedin_url: string; portfolio_url: string; visible_contacts: string; country: string; region: string; city: string;
   work_modes: string; palette: string; font: string; layout: string; alignment: string; is_owner_featured: number;
-  is_published: number; is_reviewed: number; reviewed_at: string | null; updated_at: string;
+  is_published: number; is_reviewed: number; reviewed_at: string | null; updated_at: string; card_skills_configured: number;
 };
 type ExperienceRow = { company: string; role: string; start_date: string; end_date: string; is_current: number; description: string; technologies: string };
 type LanguageRow = { language: string; proficiency: string };
@@ -221,6 +221,12 @@ async function skillsFor(profileId: number, env: AppEnv): Promise<{ name: string
   return result.results;
 }
 
+async function highlightedSkillsFor(profileId: number, env: AppEnv): Promise<{ name: string; slug: string }[]> {
+  const result = await env.DB.prepare("SELECT s.name, s.slug FROM skills s JOIN profile_card_skills pcs ON pcs.skill_id = s.id WHERE pcs.profile_id = ? ORDER BY pcs.sort_order")
+    .bind(profileId).all<{ name: string; slug: string }>();
+  return result.results;
+}
+
 async function resumeFor(profileId: number, env: AppEnv): Promise<{ experiences: Experience[]; languages: Language[]; education: Education[] }> {
   const [experienceRows, languageRows, educationRows] = await Promise.all([
     env.DB.prepare("SELECT company, role, start_date, end_date, is_current, description, technologies FROM profile_experiences WHERE profile_id = ? ORDER BY sort_order, id").bind(profileId).all<ExperienceRow>(),
@@ -291,10 +297,13 @@ async function yearsForProfiles(profileIds: number[], env: AppEnv): Promise<Map<
 
 async function serialize(row: ProfileRow, env: AppEnv, detail = false, privateFields = false, yearsExperience?: number): Promise<JsonRecord> {
   const visible = parseList(row.visible_contacts);
-  const skills = await skillsFor(row.profile_id, env);
+  const [skills, highlightedSkills] = await Promise.all([
+    skillsFor(row.profile_id, env),
+    row.card_skills_configured ? highlightedSkillsFor(row.profile_id, env) : Promise.resolve(null),
+  ]);
   const profile: JsonRecord = {
     id: row.profile_id, slug: row.slug, firstName: row.first_name, lastName: row.last_name, title: row.professional_title,
-    location: location(row), workModes: parseList(row.work_modes), skills,
+    location: location(row), workModes: parseList(row.work_modes), skills, highlightedSkills,
     style: { palette: row.palette, font: row.font, layout: row.layout, alignment: row.alignment },
     contacts: { email: privateFields || visible.includes("email") ? row.profile_email || null : null, linkedin: privateFields || visible.includes("linkedin") ? row.linkedin_url || null : null },
     isReviewed: Boolean(row.is_reviewed), isFeatured: Boolean(row.is_owner_featured),
@@ -305,13 +314,13 @@ async function serialize(row: ProfileRow, env: AppEnv, detail = false, privateFi
     Object.assign(profile, { introduction: row.introduction, portfolio: row.portfolio_url, country: row.country, region: row.region, city: row.city, ...resume, yearsExperience: yearsExperience ?? yearsFromExperiences(resume.experiences) });
   }
   if (privateFields) Object.assign(profile, {
-    editable: { firstName: row.first_name, lastName: row.last_name, email: row.profile_email, linkedin: row.linkedin_url, visibleContacts: visible, workModes: parseList(row.work_modes), skills: skills.map((skill) => skill.slug), isPublished: Boolean(row.is_published) },
+    editable: { firstName: row.first_name, lastName: row.last_name, email: row.profile_email, linkedin: row.linkedin_url, visibleContacts: visible, workModes: parseList(row.work_modes), skills: skills.map((skill) => skill.slug), highlightedSkills: highlightedSkills?.map((skill) => skill.slug) ?? null, isPublished: Boolean(row.is_published) },
     isAdmin: Boolean(row.is_staff),
   });
   return profile;
 }
 
-const profileSelect = "SELECT p.id AS profile_id, p.slug, p.professional_title, p.introduction, p.email AS profile_email, p.linkedin_url, p.portfolio_url, p.visible_contacts, p.country, p.region, p.city, p.work_modes, p.palette, p.font, p.layout, p.alignment, p.is_owner_featured, p.is_published, p.is_reviewed, p.reviewed_at, p.updated_at, u.id, u.email, u.first_name, u.last_name, u.is_staff FROM profiles p JOIN users u ON u.id = p.user_id";
+const profileSelect = "SELECT p.id AS profile_id, p.slug, p.professional_title, p.introduction, p.email AS profile_email, p.linkedin_url, p.portfolio_url, p.visible_contacts, p.country, p.region, p.city, p.work_modes, p.palette, p.font, p.layout, p.alignment, p.is_owner_featured, p.is_published, p.is_reviewed, p.reviewed_at, p.updated_at, p.card_skills_configured, u.id, u.email, u.first_name, u.last_name, u.is_staff FROM profiles p JOIN users u ON u.id = p.user_id";
 
 async function profileBySlug(slug: string, env: AppEnv, publicOnly = true): Promise<ProfileRow | null> {
   return env.DB.prepare(`${profileSelect} WHERE p.slug = ?${publicOnly ? " AND p.is_published = 1" : ""}`).bind(slug).first<ProfileRow>();
@@ -441,6 +450,25 @@ export async function handleApi(request: Request, env: AppEnv): Promise<Response
     if (method !== "PUT") return error("Método no permitido.", 405);
     const data = await body(request); if (!data) return error("El cuerpo debe ser JSON válido.");
     const resume = resumeData(data); if (resume.detail) return error(resume.detail);
+    const currentSkills = await skillsFor(profile.profile_id, env);
+    const currentHighlights = profile.card_skills_configured ? await highlightedSkillsFor(profile.profile_id, env) : [];
+    if (data.skills !== undefined && (!Array.isArray(data.skills) || data.skills.some((value) => typeof value !== "string"))) return error("Las habilidades deben ser una lista de identificadores válidos.");
+    const nextSkillSlugs = data.skills === undefined
+      ? currentSkills.map((skill) => skill.slug)
+      : [...new Set((data.skills as string[]).map((slug) => slug.trim()).filter(Boolean))];
+    if (data.highlightedSkills !== undefined && (!Array.isArray(data.highlightedSkills) || data.highlightedSkills.length > 4 || data.highlightedSkills.some((value) => typeof value !== "string"))) {
+      return error("Las habilidades destacadas deben ser una lista de hasta 4 habilidades.");
+    }
+    const highlightedSkillsProvided = data.highlightedSkills !== undefined;
+    const nextHighlightedSlugs = highlightedSkillsProvided
+      ? [...new Set((data.highlightedSkills as string[]).map((slug) => slug.trim()).filter(Boolean))]
+      : currentHighlights.map((skill) => skill.slug).filter((slug) => nextSkillSlugs.includes(slug));
+    if (nextHighlightedSlugs.length > 4 || nextHighlightedSlugs.some((slug) => !nextSkillSlugs.includes(slug))) return error("Las habilidades destacadas deben estar incluidas en las habilidades del perfil.");
+    if (highlightedSkillsProvided && nextHighlightedSlugs.length) {
+      const catalog = await env.DB.prepare("SELECT slug FROM skills").all<{ slug: string }>();
+      const knownSlugs = new Set(catalog.results.map((skill) => skill.slug));
+      if (nextHighlightedSlugs.some((slug) => !knownSlugs.has(slug))) return error("Las habilidades destacadas deben usar identificadores válidos.");
+    }
     const firstName = stringValue(data, "firstName", user.first_name); const lastName = stringValue(data, "lastName", user.last_name);
     if (!firstName || !lastName) return error("Nombre y apellido son obligatorios.");
     const title = stringValue(data, "title", profile.professional_title); const introduction = stringValue(data, "introduction", profile.introduction);
@@ -451,13 +479,16 @@ export async function handleApi(request: Request, env: AppEnv): Promise<Response
     const email = stringValue(data, "email", profile.profile_email); const timestamp = now();
     const statements: PreparedStatement[] = [
       env.DB.prepare("UPDATE users SET first_name = ?, last_name = ? WHERE id = ?").bind(firstName, lastName, user.id),
-      env.DB.prepare("UPDATE profiles SET professional_title = ?, introduction = ?, email = ?, linkedin_url = ?, portfolio_url = ?, country = ?, region = ?, city = ?, visible_contacts = ?, work_modes = ?, palette = ?, font = ?, layout = ?, alignment = ?, is_published = ?, updated_at = ? WHERE id = ?")
-        .bind(title, introduction, email, stringValue(data, "linkedin", profile.linkedin_url), stringValue(data, "portfolio", profile.portfolio_url), stringValue(data, "country", profile.country), stringValue(data, "region", profile.region), stringValue(data, "city", profile.city), JSON.stringify(permitted(data, "visibleContacts", ["email", "linkedin"], parseList(profile.visible_contacts))), JSON.stringify(permitted(data, "workModes", ["remote", "hybrid", "onsite"], parseList(profile.work_modes))), styleValue("palette", ["ink", "ocean", "orchid", "moss", "sunset", "terracotta", "lagoon", "slate"], profile.palette), styleValue("font", ["sans", "serif", "geometric"], profile.font), styleValue("layout", ["classic", "centered", "compact"], profile.layout), styleValue("alignment", ["left", "center"], profile.alignment), Number(published), timestamp, profile.profile_id),
+      env.DB.prepare("UPDATE profiles SET professional_title = ?, introduction = ?, email = ?, linkedin_url = ?, portfolio_url = ?, country = ?, region = ?, city = ?, visible_contacts = ?, work_modes = ?, palette = ?, font = ?, layout = ?, alignment = ?, is_published = ?, card_skills_configured = ?, updated_at = ? WHERE id = ?")
+        .bind(title, introduction, email, stringValue(data, "linkedin", profile.linkedin_url), stringValue(data, "portfolio", profile.portfolio_url), stringValue(data, "country", profile.country), stringValue(data, "region", profile.region), stringValue(data, "city", profile.city), JSON.stringify(permitted(data, "visibleContacts", ["email", "linkedin"], parseList(profile.visible_contacts))), JSON.stringify(permitted(data, "workModes", ["remote", "hybrid", "onsite"], parseList(profile.work_modes))), styleValue("palette", ["ink", "ocean", "orchid", "moss", "sunset", "terracotta", "lagoon", "slate"], profile.palette), styleValue("font", ["sans", "serif", "geometric"], profile.font), styleValue("layout", ["classic", "centered", "compact"], profile.layout), styleValue("alignment", ["left", "center"], profile.alignment), Number(published), Number(highlightedSkillsProvided || profile.card_skills_configured), timestamp, profile.profile_id),
     ];
     if (Array.isArray(data.skills)) {
-      const slugs = data.skills.filter((value): value is string => typeof value === "string");
       statements.push(env.DB.prepare("DELETE FROM profile_skills WHERE profile_id = ?").bind(profile.profile_id));
-      for (const slug of slugs) statements.push(env.DB.prepare("INSERT OR IGNORE INTO profile_skills (profile_id, skill_id) SELECT ?, id FROM skills WHERE slug = ?").bind(profile.profile_id, slug));
+      for (const slug of nextSkillSlugs) statements.push(env.DB.prepare("INSERT OR IGNORE INTO profile_skills (profile_id, skill_id) SELECT ?, id FROM skills WHERE slug = ?").bind(profile.profile_id, slug));
+    }
+    if (highlightedSkillsProvided || (Array.isArray(data.skills) && Boolean(profile.card_skills_configured))) {
+      statements.push(env.DB.prepare("DELETE FROM profile_card_skills WHERE profile_id = ?").bind(profile.profile_id));
+      nextHighlightedSlugs.forEach((slug, order) => statements.push(env.DB.prepare("INSERT INTO profile_card_skills (profile_id, skill_id, sort_order) SELECT ?, id, ? FROM skills WHERE slug = ?").bind(profile.profile_id, order, slug)));
     }
     if (resume.experiences) {
       statements.push(env.DB.prepare("DELETE FROM profile_experiences WHERE profile_id = ?").bind(profile.profile_id));

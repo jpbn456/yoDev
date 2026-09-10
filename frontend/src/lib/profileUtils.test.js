@@ -9,6 +9,8 @@ import {
   normalizeLanguages,
   formatEducationPeriod,
   parseTags,
+  normalizeSkillNames,
+  skillsForCard,
 } from "./profileUtils.js";
 
 describe("parseTags", () => {
@@ -143,6 +145,21 @@ describe("toggleValue", () => {
     const original = ["a"];
     toggleValue(original, "b");
     expect(original).toEqual(["a"]);
+  });
+});
+
+describe("directory card skills", () => {
+  it("normalizes API skill objects to display names", () => {
+    expect(normalizeSkillNames([{ slug: "typescript", name: "TypeScript" }, "React", null])).toEqual(["TypeScript", "React"]);
+  });
+
+  it("uses explicit highlights, including an explicitly empty selection", () => {
+    expect(skillsForCard({ skills: ["A", "B", "C"], highlightedSkills: ["C", "A"] })).toEqual(["C", "A"]);
+    expect(skillsForCard({ skills: ["A", "B"], highlightedSkills: [] })).toEqual([]);
+  });
+
+  it("falls back to the first four profile skills when highlights are not configured", () => {
+    expect(skillsForCard({ skills: ["A", "B", "C", "D", "E"], highlightedSkills: null })).toEqual(["A", "B", "C", "D"]);
   });
 });
 

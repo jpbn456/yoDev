@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { QRCodeSVG } from "qrcode.react";
 import { fallbackSkills } from "./fallbackSkills.js";
-import { calculateYears, workModeLabel, toggleValue, proficiencyOptions, optionsWithLegacy, normalizeLanguages, formatEducationPeriod, parseTags } from "./lib/profileUtils.js";
+import { calculateYears, workModeLabel, toggleValue, proficiencyOptions, optionsWithLegacy, normalizeLanguages, normalizeSkillNames, skillsForCard, formatEducationPeriod, parseTags } from "./lib/profileUtils.js";
 import "./styles.css";
 
 const workModes = [
@@ -75,6 +75,7 @@ const blankProfile = {
   visibleContacts: [],
   workModes: [],
   skills: [],
+  highlightedSkills: [],
   experiences: [],
   languages: [],
   education: [],
@@ -83,10 +84,12 @@ const blankProfile = {
 };
 
 function normalizeProfile(profile) {
+  const highlightedSkills = profile.highlightedSkills == null ? null : normalizeSkillNames(profile.highlightedSkills);
   return {
     ...profile,
     style: { ...defaultStyle, ...profile.style },
-    skills: (profile.skills || []).map((skill) => (typeof skill === "string" ? skill : skill.name)),
+    skills: normalizeSkillNames(profile.skills),
+    highlightedSkills,
     workModes: (profile.workModes || []).map(modeLabel),
     contacts: profile.editable ? {
       email: profile.editable.visibleContacts?.includes("email") ? profile.contacts?.email : null,
@@ -263,7 +266,7 @@ function ProfileCard({ profile, open, preview = false }) {
           {profile.location && <span className="location">{profile.location}</span>}
         </span>
         <div className="skill-row">
-          {(profile.skills || []).slice(0, 4).map((skill) => (
+          {skillsForCard(profile).map((skill) => (
             <span key={skill}>{skill}</span>
           ))}
           {calculateYears(profile.experiences) > 0 && <span className="years-badge">{calculateYears(profile.experiences)} años exp.</span>}
@@ -451,6 +454,35 @@ function SkillPicker({ label, hint, options, selected, onChange, variant = "defa
   );
 }
 
+function HighlightedSkillsPicker({ options, selected, onChange }) {
+  const maximum = 4;
+  return (
+    <fieldset className="card-skill-selector">
+      <legend>Habilidades destacadas en la tarjeta</legend>
+      <p>Elegí hasta 4 de las habilidades de tu perfil. Solo estas aparecerán en la tarjeta del directorio.</p>
+      {options.length ? (
+        <div>
+          {options.map((skill) => {
+            const checked = selected.includes(skill.slug);
+            return (
+              <label key={skill.slug}>
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  disabled={!checked && selected.length >= maximum}
+                  onChange={() => onChange(toggleValue(selected, skill.slug))}
+                />
+                <span>{skill.name}</span>
+              </label>
+            );
+          })}
+        </div>
+      ) : <span className="card-skill-empty">Primero seleccioná habilidades para tu perfil.</span>}
+      <small aria-live="polite">{selected.length} de {maximum} seleccionadas</small>
+    </fieldset>
+  );
+}
+
 function LanguagePicker({ label, options, selected, onChange }) {
   const [query, setQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
@@ -540,11 +572,17 @@ function ProfileEditor({ profile, skillOptions, close, saved }) {
   const update = (key, value) => setDraft((current) => ({ ...current, [key]: value }));
   const updateStyle = (key, value) =>
     setDraft((current) => ({ ...current, style: { ...current.style, [key]: value } }));
+  const updateSkills = (skills) => setDraft((current) => ({
+    ...current,
+    skills,
+    highlightedSkills: current.highlightedSkills.filter((slug) => skills.includes(slug)),
+  }));
 
   const preview = {
     ...draft,
     location: [draft.city, draft.region, draft.country].filter(Boolean).join(", "),
     skills: draft.skills.map((slug) => skillOptions.find((skill) => skill.slug === slug)?.name || slug),
+    highlightedSkills: draft.highlightedSkills.map((slug) => skillOptions.find((skill) => skill.slug === slug)?.name || slug),
     workModes: draft.workModes.map(modeLabel),
     contacts: {
       email: draft.visibleContacts.includes("email") ? draft.email : null,
@@ -707,7 +745,12 @@ function ProfileEditor({ profile, skillOptions, close, saved }) {
               hint="Podés buscar por nombre. Presioná Enter para elegir la primera coincidencia."
               options={skillOptions}
               selected={draft.skills}
-              onChange={(skills) => update("skills", skills)}
+              onChange={updateSkills}
+            />
+            <HighlightedSkillsPicker
+              options={draft.skills.map((slug) => skillOptions.find((skill) => skill.slug === slug) || { slug, name: slug })}
+              selected={draft.highlightedSkills}
+              onChange={(highlightedSkills) => update("highlightedSkills", highlightedSkills)}
             />
           </section>
 
@@ -895,7 +938,7 @@ function ProfileDetail({ profile, owner = false, onEdit }) {
               <span className="print-copy-role">{profile.title || "Developer"}</span>
               <h2>{profile.firstName} <em>{profile.lastName}</em></h2>
               {profile.location && <p>{profile.location}</p>}
-              <div className="print-copy-skills">{profile.skills.slice(0, 4).map((skill) => <span key={skill}>{skill}</span>)}</div>
+              <div className="print-copy-skills">{skillsForCard(profile).map((skill) => <span key={skill}>{skill}</span>)}</div>
               <div className="print-copy-contacts">{profile.contacts.email && <span>{profile.contacts.email}</span>}{profile.contacts.linkedin && <span>LinkedIn</span>}</div>
             </div>
             <div className="print-copy-qr"><QRCodeSVG value={profileUrl} title={`QR de ${profile.firstName} ${profile.lastName}`} size={96} level="Q" marginSize={4} bgColor="#ffffff" fgColor="#101538" /><small>{profileUrl}</small></div>
@@ -1210,6 +1253,7 @@ function App() {
         ...account.editable,
         style: { ...defaultStyle, ...account.style },
         skills: account.editable?.skills || [],
+        highlightedSkills: account.editable?.highlightedSkills ?? (account.editable?.skills || []).slice(0, 4),
         visibleContacts: account.editable?.visibleContacts || [],
         workModes: account.editable?.workModes || [],
         isPublished: account.editable?.isPublished || false,

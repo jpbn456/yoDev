@@ -36,6 +36,7 @@ beforeEach(async () => {
   database.prepare("INSERT INTO sessions (user_id, token_hash, expires_at) VALUES (1, ?, '2099-01-01')").run(await sha256("test-session"));
   migration("0006_education_current.sql");
   migration("0008_rate_limits.sql");
+  migration("0009_profile_card_skills.sql");
   env = { DB: { prepare, async batch(statements) {
     database.exec("BEGIN");
     try { const results = await Promise.all(statements.map((statement) => statement.run())); database.exec("COMMIT"); return results; }

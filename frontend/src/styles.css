@@ -2017,6 +2017,75 @@ textarea:focus-visible {
   gap: 0.5rem;
 }
 
+.card-skill-selector {
+  margin: 0;
+  padding: 0.85rem;
+  display: grid;
+  gap: 0.65rem;
+  border: 1px solid var(--line);
+  border-radius: var(--control-radius);
+}
+
+.card-skill-selector legend {
+  padding: 0 0.25rem;
+  color: #383833;
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.card-skill-selector p,
+.card-skill-selector small,
+.card-skill-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.64rem;
+  line-height: 1.45;
+}
+
+.card-skill-selector > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.card-skill-selector label {
+  position: relative;
+}
+
+.card-skill-selector input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.card-skill-selector label span {
+  padding: 0.38rem 0.58rem;
+  display: block;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: white;
+  color: var(--ink);
+  font-size: 0.66rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.card-skill-selector input:checked + span {
+  border-color: var(--blue);
+  background: var(--blue);
+  color: white;
+}
+
+.card-skill-selector input:focus-visible + span {
+  outline: 3px solid color-mix(in srgb, var(--blue), transparent 70%);
+  outline-offset: 2px;
+}
+
+.card-skill-selector input:disabled + span {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 .skill-selector-label,
 .language-picker-label {
   color: #383833;

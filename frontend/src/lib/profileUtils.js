@@ -92,6 +92,15 @@ export function toggleValue(values, value) {
   return values.includes(value) ? values.filter((item) => item !== value) : [...values, value];
 }
 
+export function normalizeSkillNames(skills = []) {
+  return skills.map((skill) => typeof skill === "string" ? skill : skill?.name).filter(Boolean);
+}
+
+export function skillsForCard(profile) {
+  const skills = Array.isArray(profile.highlightedSkills) ? profile.highlightedSkills : profile.skills || [];
+  return skills.slice(0, 4);
+}
+
 /**
  * Filter demo/fallback profiles against the active filters.
  * Mirrors the backend filtering contract.

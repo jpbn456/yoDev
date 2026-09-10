@@ -47,7 +47,7 @@ describe("Turso database contract and migrations", () => {
     const migrations = await client.execute("SELECT COUNT(*) AS total FROM _yodev_migrations");
     const skills = await client.execute("SELECT COUNT(*) AS total FROM skills");
     const users = await client.execute("SELECT COUNT(*) AS total FROM users");
-    expect(Number(migrations.rows[0]!.total)).toBe(8);
+    expect(Number(migrations.rows[0]!.total)).toBe(9);
     expect(Number(skills.rows[0]!.total)).toBe(440);
     expect(Number(users.rows[0]!.total)).toBe(0);
   });
@@ -69,13 +69,19 @@ describe("portable application handler", () => {
     const update = await handleApi(request("/api/me/profile/", {
       method: "PUT",
       headers: { Cookie: cookies, "X-CSRFToken": auth.token, Origin: "https://yodev.example", "Content-Type": "application/json" },
-      body: JSON.stringify({ title: "Platform Engineer", introduction: "Portable profile", isPublished: true, skills: ["typescript"], workModes: ["remote"] }),
+      body: JSON.stringify({ title: "Platform Engineer", introduction: "Portable profile", isPublished: true, skills: ["typescript", "react"], highlightedSkills: ["react"], workModes: ["remote"] }),
     }), env);
     expect(update.status).toBe(200);
-    const profile = await update.json() as { slug: string };
+    const profile = await update.json() as { slug: string; highlightedSkills: { slug: string }[]; editable: { highlightedSkills: string[] } };
+    expect(profile.highlightedSkills.map((skill) => skill.slug)).toEqual(["react"]);
+    expect(profile.editable.highlightedSkills).toEqual(["react"]);
     const listing = await handleApi(request("/api/profiles/?required_skills=typescript&work_modes=remote"), env);
-    expect((await listing.json() as { results: unknown[] }).results).toHaveLength(1);
-    expect((await handleApi(request(`/api/profiles/${profile.slug}/`), env)).status).toBe(200);
+    const listedProfiles = (await listing.json() as { results: { highlightedSkills: { slug: string }[] }[] }).results;
+    expect(listedProfiles).toHaveLength(1);
+    expect(listedProfiles[0]?.highlightedSkills.map((skill) => skill.slug)).toEqual(["react"]);
+    const detail = await handleApi(request(`/api/profiles/${profile.slug}/`), env);
+    expect(detail.status).toBe(200);
+    expect((await detail.json() as { highlightedSkills: { slug: string }[] }).highlightedSkills.map((skill) => skill.slug)).toEqual(["react"]);
 
     const loginSecurity = await csrf();
     const login = await handleApi(request("/api/auth/login/", { method: "POST", headers: { Cookie: loginSecurity.cookie, "X-CSRFToken": loginSecurity.token, "Content-Type": "application/json" }, body: JSON.stringify({ email: "developer@example.com", password: "correct-horse" }) }), env);
@@ -83,6 +89,37 @@ describe("portable application handler", () => {
     const logout = await handleApi(request("/api/auth/logout/", { method: "POST", headers: { Cookie: `${login.headers.getSetCookie()[0]!.split(";")[0]}; ${loginSecurity.cookie}`, "X-CSRFToken": loginSecurity.token } }), env);
     expect(logout.status).toBe(204);
     expect(logout.headers.getSetCookie()[0]).toContain("Max-Age=0");
+  });
+
+  it("preserves legacy fallback state and validates and prunes configured card skills", async () => {
+    const auth = await register();
+    const cookies = `${auth.session}; ${auth.csrfCookie}`;
+    const put = (payload: unknown) => handleApi(request("/api/me/profile/", {
+      method: "PUT",
+      headers: { Cookie: cookies, "X-CSRFToken": auth.token, Origin: "https://yodev.example", "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }), env);
+
+    const legacy = await put({ skills: ["typescript", "react", "python", "git", "docker"] });
+    expect(legacy.status).toBe(200);
+    expect((await legacy.json() as { highlightedSkills: null }).highlightedSkills).toBeNull();
+
+    const tooMany = await put({ skills: ["typescript", "react", "python", "git", "docker"], highlightedSkills: ["typescript", "react", "python", "git", "docker"] });
+    expect(tooMany.status).toBe(400);
+    const outsideProfile = await put({ skills: ["typescript"], highlightedSkills: ["python"] });
+    expect(outsideProfile.status).toBe(400);
+
+    const configured = await put({ skills: ["typescript", "react"], highlightedSkills: ["react", "typescript"] });
+    expect(configured.status).toBe(200);
+    expect((await configured.json() as { highlightedSkills: { slug: string }[] }).highlightedSkills.map((skill) => skill.slug)).toEqual(["react", "typescript"]);
+
+    const pruned = await put({ skills: ["typescript"] });
+    expect(pruned.status).toBe(200);
+    const persisted = await pruned.json() as { highlightedSkills: { slug: string }[]; editable: { highlightedSkills: string[] } };
+    expect(persisted.highlightedSkills.map((skill) => skill.slug)).toEqual(["typescript"]);
+    expect(persisted.editable.highlightedSkills).toEqual(["typescript"]);
+    const rows = await client.execute("SELECT pcs.sort_order, s.slug FROM profile_card_skills pcs JOIN skills s ON s.id = pcs.skill_id ORDER BY pcs.sort_order");
+    expect(rows.rows.map((row) => row.slug)).toEqual(["typescript"]);
   });
 
   it("rejects missing CSRF and cross-origin mutations", async () => {
